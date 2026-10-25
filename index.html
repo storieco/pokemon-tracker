@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Pokémon Buy Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font-anthropic-sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-anthropic-serif:'Source Serif 4',Georgia,serif;
+  --color-bg:#f6f5f1;--color-panel:#ffffff;--color-fg:#1f1e1b;--color-fg-muted:#6b6862;
+  --color-border-line:#e3e0d8;--color-ok:#2f8a5f;--color-warn:#b7791f;--color-bad:#c0453a;
+  --cds-text-secondary:var(--color-fg-muted);--cds-border:var(--color-border-line);
+  --cds-surface-popover:#ffffff;--cds-shadow-popover:0 6px 24px rgba(0,0,0,.12);
+  --cds-chart-axis:#a19d94;--cds-chart-grid:#ece9e2;
+  --cds-gap-xs:4px;--cds-gap-sm:8px;--cds-gap-md:16px;--cds-gap-lg:24px;
+  --cds-pad-xs:4px;--cds-pad-sm:8px;--cds-pad-lg:20px;
+  --cds-radius:12px;--cds-dur-slow:300ms;
+  --cds-font-size-caption:12.5px;--cds-font-size-body:14px;--cds-font-size-heading:17px;--cds-font-size-title:30px;
+  --cds-font-weight-medium:600;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --color-bg:#161614;--color-panel:#211f1c;--color-fg:#f1efea;--color-fg-muted:#a8a49c;
+    --color-border-line:#36332e;--color-ok:#5cc28e;--color-warn:#e0a64a;--color-bad:#ec7a6f;
+    --cds-surface-popover:#2a2824;--cds-shadow-popover:0 6px 24px rgba(0,0,0,.5);
+    --cds-chart-axis:#7d7970;--cds-chart-grid:#2e2b27;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--color-bg);color:var(--color-fg);font-family:var(--font-anthropic-sans);font-size:var(--cds-font-size-body);line-height:1.45}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--color-border-line);background:var(--color-panel)}
+.brand{font-family:var(--font-anthropic-serif);font-size:18px}
+.acct{display:flex;align-items:center;gap:12px;color:var(--color-fg-muted);font-size:var(--cds-font-size-caption);flex-wrap:wrap}
+.btn{font:inherit;font-size:14px;border:1px solid var(--color-border-line);background:var(--color-panel);color:var(--color-fg);border-radius:8px;padding:8px 14px;cursor:pointer}
+.btn.primary{background:var(--color-fg);color:var(--color-bg);border-color:var(--color-fg)}
+.btn:disabled{opacity:.6;cursor:default}
+#dash-root{max-width:1200px;margin:0 auto;padding:20px 16px 48px}
+.gate{max-width:420px;width:calc(100% - 32px);margin:12vh auto;padding:28px 24px;background:var(--color-panel);border:1px solid var(--color-border-line);border-radius:var(--cds-radius)}
+.gate h1{font-family:var(--font-anthropic-serif);font-weight:400;font-size:26px;margin:0 0 6px}
+.gate p{color:var(--color-fg-muted);margin:0 0 18px}
+.gate input{width:100%;font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--color-border-line);border-radius:8px;background:var(--color-bg);color:var(--color-fg);margin-bottom:12px}
+.gate .btn{width:100%}
+#login-msg{margin-top:12px;min-height:1.2em;font-size:13px;color:var(--color-fg-muted)}
+[hidden]{display:none!important}
+</style>
+<script src="vendor/d3.min.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="shim.js"></script>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">Pokémon Buy Board</div>
+  <div class="acct" id="account" hidden>
+    <span id="updated"></span>
+    <span id="who"></span>
+    <button class="btn" id="signout" type="button">Sign out</button>
+  </div>
+</div>
+
+<div class="gate" id="login">
+  <h1>Sign in</h1>
+  <p>Enter your email and we'll send you a sign-in link. Only approved emails can see the board.</p>
+  <form id="login-form">
+    <input id="email" type="email" autocomplete="email" placeholder="you@example.com" aria-label="Email" required>
+    <button class="btn primary" id="send" type="submit">Send sign-in link</button>
+  </form>
+  <div id="login-msg" role="status"></div>
+</div>
+
+<div class="gate" id="denied" hidden>
+  <h1>Not approved yet</h1>
+  <p>You're signed in, but this email isn't on the approved list. Ask Ashton to add you, then reload this page.</p>
+</div>
+
+<div id="board" hidden>
+<div id="dash-root">
+<style>
+.pw{display:flex;flex-direction:column;gap:var(--cds-gap-lg);font-family:var(--font-anthropic-sans)}
+.pw h1{font-family:var(--font-anthropic-serif);font-weight:400;font-size:var(--cds-font-size-title);margin:0}
+.pw .lede{color:var(--color-fg-muted);margin:var(--cds-gap-xs) 0 0}
+.pw .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr));gap:var(--cds-gap-md)}
+.pw .card{background:var(--color-panel);border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:var(--cds-pad-lg);min-width:0}
+.pw .lab{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
+.pw .big{font-family:var(--font-anthropic-serif);font-weight:400;font-size:var(--cds-font-size-title);margin-top:var(--cds-gap-xs);font-variant-numeric:tabular-nums}
+.pw h2{font-size:var(--cds-font-size-heading);font-weight:var(--cds-font-weight-medium);margin:0}
+.pw .note{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);margin:var(--cds-gap-xs) 0 var(--cds-gap-md)}
+.pw .scroll{overflow:auto;max-height:36rem}
+.pw table{width:100%;border-collapse:collapse;font-size:var(--cds-font-size-body);font-variant-numeric:tabular-nums}
+.pw th{position:sticky;top:0;z-index:1;background:var(--color-panel);text-align:left;font-weight:var(--cds-font-weight-medium);font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);padding:var(--cds-pad-xs) var(--cds-pad-sm);border-bottom:1px solid var(--color-border-line);white-space:nowrap}
+.pw td{padding:var(--cds-pad-xs) var(--cds-pad-sm);border-bottom:1px solid var(--color-border-line);vertical-align:top}
+.pw td.num,.pw th.num{text-align:right}
+.pw .sub{display:block;font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
+.pw .up{color:var(--color-ok)} .pw .dn{color:var(--color-bad)}
+.pw .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr));gap:var(--cds-gap-md)}
+.pw .ctl{display:flex;flex-wrap:wrap;align-items:center;gap:var(--cds-gap-sm);margin-bottom:var(--cds-gap-md);font-size:var(--cds-font-size-caption)}
+.pw .seg{display:inline-flex;border:1px solid var(--color-border-line);border-radius:var(--cds-radius);overflow:hidden}
+.pw .seg button{font:inherit;font-size:var(--cds-font-size-caption);background:transparent;color:var(--color-fg);border:0;padding:var(--cds-pad-xs) var(--cds-pad-sm);cursor:pointer}
+.pw .seg button[aria-pressed=true]{background:var(--color-fg);color:var(--color-bg)}
+.pw .legend{display:flex;flex-wrap:wrap;gap:var(--cds-gap-xs) var(--cds-gap-md);font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);margin-bottom:var(--cds-gap-md)}
+.pw .legend span{display:inline-flex;align-items:center;gap:6px}
+.pw .legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.pw .score{display:flex;align-items:center;gap:var(--cds-gap-sm);min-width:9rem}
+.pw .score b{font-weight:var(--cds-font-weight-medium);width:2ch;text-align:right}
+.pw .stack{display:flex;height:10px;width:100%;max-width:140px;border-radius:5px;overflow:hidden;background:var(--cds-chart-grid)}
+.pw .stack i{display:block;height:100%}
+.pw .prod{display:flex;gap:var(--cds-gap-sm);align-items:flex-start}
+.pw .ph{flex:0 0 56px;height:56px;border-radius:var(--cds-radius);background:var(--color-bg);border:1px solid var(--color-border-line);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.pw .ph img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.pw .ph.none{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
+.pw .nav{display:flex;flex-wrap:wrap;gap:var(--cds-gap-xs)}
+.pw .nav a{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);text-decoration:none;border:1px solid var(--color-border-line);border-radius:999px;padding:2px var(--cds-pad-sm)}
+.pw .nav a:hover{color:var(--color-fg)}
+.pw .field{display:inline-flex;align-items:center;gap:6px}
+.pw .field input,.pw .field select{font:inherit;font-size:var(--cds-font-size-body);color:var(--color-fg);background:var(--color-bg);border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:4px 8px}
+.pw .field input{width:8rem}
+.pw .field input.pct{width:4.5rem}
+.pw .totals{display:flex;flex-wrap:wrap;gap:var(--cds-gap-lg);margin:var(--cds-gap-sm) 0 var(--cds-gap-md)}
+.pw .totals div{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
+.pw .totals b{display:block;font-family:var(--font-anthropic-serif);font-weight:400;font-size:var(--cds-font-size-heading);color:var(--color-fg);font-variant-numeric:tabular-nums}
+.pw .share{display:block;height:6px;border-radius:3px;background:var(--cds-chart-grid);margin-top:4px;max-width:120px}
+.pw .share i{display:block;height:100%;border-radius:3px}
+.pw .chartbox{position:relative;min-height:240px}
+.pw .tip{position:absolute;pointer-events:none;background:var(--cds-surface-popover);border:1px solid var(--cds-border);border-radius:var(--cds-radius);box-shadow:var(--cds-shadow-popover);padding:var(--cds-pad-xs) var(--cds-pad-sm);font-size:var(--cds-font-size-caption);white-space:nowrap}
+.pw .tip span{display:block;color:var(--cds-text-secondary)}
+.pw .badge{display:inline-block;font-size:var(--cds-font-size-caption);border:1px solid var(--color-border-line);border-radius:999px;padding:0 6px;color:var(--color-fg-muted);white-space:nowrap}
+.pw .soon{color:var(--color-warn)}
+.pw .dash-line{stroke-dasharray:5 4}
+.pw .muted{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
+.pw [data-dash-source-state=empty]{color:transparent}
+.pw [data-dash-source-state=refreshing]{opacity:.5;transition:opacity var(--cds-dur-slow)}
+@media (max-width:560px){.pw .hide-sm{display:none}}
+</style>
+<div class="pw">
+  <header id="top">
+    <h1>Pokémon wholesale buy board</h1>
+    <p class="lede" id="takeaway">—</p>
+    <nav class="nav" aria-label="Sections" style="margin-top:var(--cds-gap-sm)">
+      <a href="#buy-plan">Buy plan</a><a href="#buy-ranking">Rankings</a><a href="#price-history">Price history</a><a href="#price-forecast">Forecast</a><a href="#release-calendar">Release calendar</a><a href="#hot-cards">Hot cards</a>
+    </nav>
+  </header>
+
+  <div class="tiles">
+    <div class="card"><div class="lab">Strongest buy for these stores</div><div class="big" id="top-item" data-source="top" data-field="item" data-where="mode=all">—</div></div>
+    <div class="card"><div class="lab">Its buy score (out of 100)</div><div class="big" id="top-score" data-source="top" data-field="score" data-where="mode=all">—</div></div>
+    <div class="card"><div class="lab">Avg resale over MSRP</div><div class="big" data-source="summary" data-field="avgPremium">—</div></div>
+    <div class="card"><div class="lab">Sealed products scored</div><div class="big" data-source="summary" data-field="count">—</div></div>
+  </div>
+
+  <section class="card" id="buy-plan">
+    <h2>Buy plan</h2>
+    <p class="note">Enter a budget and the plan splits it across the top-scoring products for the store type picked below (scores of 60 and up). Products that don't suit those stores are left out (no booster boxes or ETBs for counters). Better scores get a bigger share, and no single product gets more than 30%. Unit cost starts at market price; if the warehouse pays less, lower the percentage.</p>
+    <div class="ctl">
+      <label class="field">Budget $<input id="budget" type="number" min="100" step="100" value="10000" inputmode="numeric"></label>
+      <label class="field">Cost as % of market <input id="costpct" class="pct" type="number" min="10" max="150" step="5" value="100" inputmode="numeric"></label>
+      <span class="muted" id="plan-mode">—</span>
+    </div>
+    <div class="totals">
+      <div>Planned spend<b id="plan-spend">—</b></div>
+      <div>Left over<b id="plan-left">—</b></div>
+      <div>Total packs<b id="plan-packs">—</b></div>
+      <div>Products<b id="plan-count">—</b></div>
+    </div>
+    <div class="scroll">
+      <table id="plan-table" data-source="buylist">
+        <thead><tr><th>Product</th><th class="num">Units</th><th class="num hide-sm">Unit cost</th><th class="num">Line total</th><th class="hide-sm">Share</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="buy-ranking">
+    <h2>What to buy, ranked</h2>
+    <p class="note">Every product is scored out of 100 on seven factors. Hobby shops want booster boxes and ETBs. Gas stations and vape shops sell from the counter, so cheap packs, blisters and bundles fit them best. "Whole route" weighs both equally.</p>
+    <div class="ctl">
+      <span>Their customers:</span>
+      <div class="seg" id="mode-seg" role="group" aria-label="Customer type">
+        <button data-mode="all" aria-pressed="true">Whole route</button>
+        <button data-mode="hobby" aria-pressed="false">Hobby shops</button>
+        <button data-mode="counter" aria-pressed="false">Gas stations &amp; vape shops</button>
+      </div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="scroll">
+      <table data-source="buylist" data-row-key="item" id="buy-table">
+        <thead><tr>
+          <th data-field="item">Product</th>
+          <th data-field="market" class="num">Market</th>
+          <th data-field="premium" class="num hide-sm">vs MSRP</th>
+          <th data-field="scoreAll" id="score-th">Buy score</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="price-history">
+    <h2>Price history</h2>
+    <p class="note">Market price saved for every product each morning. The chart fills in as days pass; most products start with one saved price today.</p>
+    <div class="ctl"><label class="field">Product <select id="hist-pick" aria-label="Product"></select></label><span class="muted" id="hist-count"></span></div>
+    <div class="chartbox" id="hist-chart" data-source="history"></div>
+    <h2 style="margin-top:var(--cds-gap-lg)">Biggest price moves</h2>
+    <p class="note">Change from the earliest saved price to the latest. Once a week of daily prices builds up, this shows the real weekly movers.</p>
+    <div class="scroll" style="max-height:20rem">
+      <table id="movers-table" data-source="movers" data-row-key="id">
+        <thead><tr><th data-field="item">Product</th><th data-field="fromDate" class="hide-sm">Since</th><th data-field="fromPrice" class="num hide-sm">Then</th><th data-field="toPrice" class="num">Now</th><th data-field="change" class="num">Change</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="price-forecast">
+    <h2>Price forecast</h2>
+    <p class="note">Where each product's market price is likely headed in 30 and 90 days. It follows the usual Pokémon pattern: new products start high, slide for a few months, level off, then slowly climb once out of print. Buyer opinion and overprint risk tilt it, and each product's own price history counts more as daily prices build up. Treat it as a guide, not a guarantee.</p>
+    <div class="scroll">
+      <table id="fc-table" data-source="forecast" data-row-key="id">
+        <thead><tr><th data-field="item">Product</th><th data-field="now" class="num hide-sm">Now</th><th data-field="pred30" class="num">30 days</th><th data-field="pred90" class="num">90 days</th><th data-field="call">What to do</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <h2 style="margin-top:var(--cds-gap-lg)">How accurate has it been?</h2>
+    <p class="note">The model replayed from an older saved price and checked against today's real price. More checks appear as history builds.</p>
+    <table id="bt-table" data-source="backtest" data-row-key="id">
+      <thead><tr><th data-field="item">Product</th><th data-field="from" class="hide-sm">Predicted from</th><th data-field="predicted" class="num">Predicted</th><th data-field="actual" class="num">Actual</th><th data-field="error" class="num">Off by</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="muted" id="bt-note" style="margin-top:var(--cds-gap-sm)"></p>
+  </section>
+
+  <section class="card" id="release-calendar">
+    <h2>Release calendar</h2>
+    <p class="note">Upcoming English and Japanese products. Orders for a release usually need to be in with the distributor weeks ahead, so plan from the left column.</p>
+    <div class="scroll">
+      <table id="cal-table" data-source="releases" data-row-key="id">
+        <thead><tr><th data-field="date">Date</th><th data-field="product">Product</th><th data-field="msrp" class="num hide-sm">MSRP</th><th data-field="storeFit">Best for</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="how-scored">
+    <h2>How the score works</h2>
+    <p class="note">Weights add to 100. Market prices and buyer opinion refresh every morning.</p>
+    <table id="weights-table">
+      <thead><tr><th>Factor</th><th class="num">Points</th><th class="hide-sm">What earns full points</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <div class="grid2">
+    <section class="card" id="hot-cards">
+      <h2>Hottest cards this month</h2>
+      <p class="note">The singles driving pack demand. Near Mint, ungraded, US market.</p>
+      <div class="scroll">
+        <table data-source="chase" data-row-key="card" id="chase-table">
+          <thead><tr><th data-field="card">Card</th><th data-field="price" class="num">Price</th><th data-field="trend" class="num">Trend</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="card" id="pull-rates">
+      <h2>Pull rates</h2>
+      <p class="note">Community counts from opened packs, not official odds. Rarer tiers are less certain.</p>
+      <div class="scroll">
+        <table data-source="pulls" data-row-key="set,tier" id="pull-table">
+          <thead><tr><th data-field="set">Set</th><th data-field="tier">Tier</th><th data-field="oneIn" class="num">1 in … packs</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>
+<script src="photos.js"></script>
+<script>
+dash.calc('buylist', {
+  title: 'Buy score by product',
+  description: 'Scores each sealed product out of 100 on buyer demand, price direction, store margin room, launch timing, print risk, holiday timing and fit for each store type.',
+  inputs: ['sealed'],
+  fn: (sealed) => {
+    const W = { demand: 25, trend: 10, margin: 20, timing: 15, print: 10, season: 10, fit: 10 };
+    const fitOf = { box: { hobby: 1, counter: 0 }, etb: { hobby: 0.9, counter: 0.4 }, bundle: { hobby: 0.7, counter: 0.7 }, counter: { hobby: 0.4, counter: 1 }, kit: { hobby: 0.8, counter: 0.6 } };
+    const r1 = v => Math.round(v * 10) / 10;
+    return sealed.map(r => {
+      const market = Number(r.market), msrp = r.msrp == null ? null : Number(r.msrp);
+      const premium = msrp ? market / msrp : null;
+      const asOf = new Date(r.asOf), rel = r.releaseDate ? new Date(r.releaseDate) : null;
+      const days = rel ? Math.round((asOf - rel) / 864e5) : null;
+      const demand = (Number(r.sentiment) + 2) / 4 * W.demand;
+      const trend = (Number(r.trend) + 1) / 2 * W.trend;
+      const secondary = r.supply === 'secondary';
+      const margin = secondary ? W.margin * 0.1 : premium == null ? W.margin / 2 : Math.max(0, Math.min(1, (premium - 1) / 2)) * W.margin;
+      const timing = days == null ? W.timing / 2 : days <= 45 ? W.timing : days <= 120 ? W.timing * 0.5 : W.timing * 0.2;
+      const print = (2 - Number(r.printRisk)) / 2 * W.print;
+      const m = asOf.getUTCMonth();
+      const beforeHoliday = !rel || rel <= new Date(Date.UTC(asOf.getUTCFullYear(), 11, 10));
+      const season = m >= 8 ? (beforeHoliday ? W.season : W.season * 0.3) : W.season * 0.5;
+      const f0 = fitOf[r.channel] || fitOf.etb;
+      const f = { hobby: f0.hobby, counter: f0.counter, all: (f0.hobby + f0.counter) / 2 };
+      const base = demand + trend + margin + timing + print + season;
+      return {
+        id: r.id, item: r.set + ' ' + r.product, set: r.set, lang: r.lang, channel: r.channel,
+        market, msrp, premium, sentiment: Number(r.sentiment), trend: Number(r.trend), printRisk: Number(r.printRisk),
+        releaseDate: r.releaseDate, daysSinceRelease: days,
+        demand: r1(demand), priceTrend: r1(trend), margin: r1(margin), timing: r1(timing), print: r1(print), season: r1(season),
+        fitAll: r1(f.all * W.fit), fitHobby: r1(f.hobby * W.fit), fitCounter: r1(f.counter * W.fit),
+        scoreAll: Math.round(base + f.all * W.fit), scoreHobby: Math.round(base + f.hobby * W.fit), scoreCounter: Math.round(base + f.counter * W.fit),
+        opinion: (secondary ? 'Resale market only: the warehouse pays market price, so stores get little margin. ' : '') + r.opinion, asOf: r.asOf, supply: r.supply || 'distributor'
+      };
+    }).sort((a, b) => b.scoreAll - a.scoreAll || b.market - a.market);
+  }
+});
+dash.calc('top', {
+  title: 'Top buy by store type',
+  description: 'The highest-scoring product for each customer type.',
+  inputs: ['buylist'],
+  fn: (buylist) => [['all', 'scoreAll'], ['hobby', 'scoreHobby'], ['counter', 'scoreCounter']].map(([mode, k]) => {
+    const best = buylist.slice().sort((a, b) => b[k] - a[k] || b.market - a.market)[0];
+    return best ? { mode, item: best.item, score: best[k], opinion: best.opinion } : { mode, item: null, score: null, opinion: null };
+  })
+});
+dash.calc('summary', {
+  title: 'Tracked totals',
+  description: 'Count of scored products and their average market price as a multiple of MSRP, where MSRP is known.',
+  inputs: ['buylist'],
+  fn: (buylist) => {
+    const p = buylist.filter(r => r.premium != null).map(r => r.premium);
+    return [{ count: buylist.length, avgPremium: p.length ? p.reduce((a, b) => a + b, 0) / p.length : null }];
+  }
+});
+
+dash.calc('movers', {
+  title: 'Price moves',
+  description: 'For each product with two or more saved prices: the change from its earliest saved price to its latest.',
+  inputs: ['history'],
+  fn: (history) => {
+    const by = d3.group(history, r => r.id);
+    const out = [];
+    for (const [id, pts] of by) {
+      const s = pts.slice().sort((a, b) => a.date < b.date ? -1 : 1);
+      if (s.length < 2) continue;
+      const a = s[0], b = s[s.length - 1];
+      out.push({ id, item: b.item, fromDate: a.date, fromPrice: Number(a.market), toDate: b.date, toPrice: Number(b.market), change: Number(b.market) / Number(a.market) - 1 });
+    }
+    return out.sort((x, y) => Math.abs(y.change) - Math.abs(x.change));
+  }
+});
+
+dash.calc('forecast', {
+  title: 'Price forecast',
+  description: 'Predicts each product 30 and 90 days out: new sets decay toward a floor (1.15x MSRP for booster boxes, 1.45x for ETBs, 1.4x otherwise) over about 2.5 months, then rise about 1.5% a month after 8 months; buyer opinion and overprint risk tilt it; once 5+ daily prices exist, the product\'s own trend line is blended in. 90-day drop capped at 30%.',
+  inputs: ['sealed', 'history'],
+  fn: (sealed, history) => {
+  const DAY = 864e5, MO = 30.44;
+  const FLOORS = { box: 1.15, etb: 1.45 }, FLOOR_OTHER = 1.4, MAX_DROP_90 = 0.3, TAU = 2.5, GROWTH = 0.015, OUT_OF_PRINT_MO = 8;
+  const parse = d => new Date(d + 'T00:00:00Z');
+  const hist = {};
+  for (const h of history) (hist[h.id] = hist[h.id] || []).push({ t: parse(h.date), v: Number(h.market) });
+  const model = (p, msrp, ageMo, hMo, sentiment, printRisk, FLOOR) => {
+    const a = Math.max(0, ageMo);
+    let base;
+    if (a >= OUT_OF_PRINT_MO) base = p * Math.pow(1 + GROWTH, hMo);
+    else {
+      const floor = msrp ? msrp * FLOOR : p * 0.85;
+      const decayed = p > floor ? floor + (p - floor) * Math.exp(-hMo / TAU) : p;
+      const growMo = Math.max(0, a + hMo - OUT_OF_PRINT_MO);
+      base = decayed * Math.pow(1 + GROWTH, growMo);
+    }
+    const sig = Math.max(-0.03, Math.min(0.03, 0.015 * sentiment)) - (printRisk >= 2 && a < 6 ? 0.015 : 0);
+    return Math.max(p * (1 - MAX_DROP_90 * Math.min(1, hMo / 3)), base * (1 + sig * hMo));
+  };
+  const trendline = (pts, at) => {
+    const t0 = pts[0].t;
+    const xs = pts.map(p => (p.t - t0) / DAY), ys = pts.map(p => Math.log(p.v));
+    const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
+    const sxx = xs.reduce((a, x) => a + (x - mx) ** 2, 0);
+    const slope = sxx ? xs.reduce((a, x, i) => a + (x - mx) * (ys[i] - my), 0) / sxx : 0;
+    return Math.exp(my + slope * ((at - t0) / DAY - mx));
+  };
+  const out = [];
+  for (const r of sealed) {
+    const p = Number(r.market), msrp = r.msrp == null ? null : Number(r.msrp);
+    const asOf = parse(r.asOf), rel = r.releaseDate ? parse(r.releaseDate) : null;
+    const ageMo = rel ? (asOf - rel) / DAY / MO : 6;
+    const pts = (hist[r.id] || []).filter(x => x.t <= asOf).sort((a, b) => a.t - b.t);
+    const span = pts.length > 1 ? (pts[pts.length - 1].t - pts[0].t) / DAY : 0;
+    const recent = pts.filter(x => (asOf - x.t) / DAY <= 120);
+    const useLine = recent.length >= 5 && (recent[recent.length - 1].t - recent[0].t) / DAY >= 7;
+    const w = useLine ? Math.min(0.6, recent.length / 40) : 0;
+    const pred = hMo => {
+      const m = model(p, msrp, ageMo, hMo, Number(r.sentiment), Number(r.printRisk), FLOORS[r.channel] || FLOOR_OTHER);
+      if (!w) return m;
+      const line = Math.min(p * 1.25, Math.max(p * 0.75, trendline(recent, new Date(+asOf + hMo * MO * DAY)) * p / trendline(recent, asOf)));
+      return (1 - w) * m + w * line;
+    };
+    const p30 = pred(1), p90 = pred(3);
+    const c30 = p30 / p - 1, c90 = p90 / p - 1;
+    const conf = (msrp ? 1 : 0) + (rel ? 1 : 0) + (span >= 30 ? 1 : 0) + (useLine ? 1 : 0);
+    const call = c90 <= -0.08 ? 'Falling: buy only what sells this month' : c90 >= 0.05 ? 'Rising: buy now, cost goes up later' : 'Steady: buy as needed';
+    out.push({ id: r.id, item: r.set + ' ' + r.product, now: p, pred30: Math.round(p30 * 100) / 100, pred90: Math.round(p90 * 100) / 100,
+      change30: c30, change90: c90, direction: c90 <= -0.03 ? 'down' : c90 >= 0.03 ? 'up' : 'flat',
+      confidence: conf >= 3 ? 'Medium' : conf === 2 ? 'Low-medium' : 'Low', usesHistory: useLine, call, asOf: r.asOf });
+  }
+  return out.sort((a, b) => a.change90 - b.change90);
+}
+});
+dash.calc('backtest', {
+  title: 'Forecast self-check',
+  description: 'Runs the same model from each product\'s earliest saved price (at least a month back) and compares the prediction to the latest actual price.',
+  inputs: ['sealed', 'history'],
+  fn: (sealed, history) => {
+  const DAY = 864e5, MO = 30.44, FLOORS = { box: 1.15, etb: 1.45 }, FLOOR_OTHER = 1.4, TAU = 2.5, GROWTH = 0.015, OUT_OF_PRINT_MO = 8;
+  const parse = d => new Date(d + 'T00:00:00Z');
+  const info = Object.fromEntries(sealed.map(r => [r.id, r]));
+  const by = {};
+  for (const h of history) (by[h.id] = by[h.id] || []).push({ t: parse(h.date), date: h.date, v: Number(h.market) });
+  const out = [];
+  for (const id in by) {
+    const r = info[id]; if (!r) continue;
+    const pts = by[id].sort((a, b) => a.t - b.t);
+    if (pts.length < 2) continue;
+    const a = pts[0], b = pts[pts.length - 1];
+    const hMo = (b.t - a.t) / DAY / MO;
+    if (hMo < 1) continue;
+    const msrp = r.msrp == null ? null : Number(r.msrp);
+    const ageMo = r.releaseDate ? Math.max(0, (a.t - parse(r.releaseDate)) / DAY / MO) : 6;
+    let pred;
+    if (ageMo >= OUT_OF_PRINT_MO) pred = a.v * Math.pow(1 + GROWTH, hMo);
+    else {
+      const floor = msrp ? msrp * (FLOORS[r.channel] || FLOOR_OTHER) : a.v * 0.85;
+      pred = (a.v > floor ? floor + (a.v - floor) * Math.exp(-hMo / TAU) : a.v) * Math.pow(1 + GROWTH, Math.max(0, ageMo + hMo - OUT_OF_PRINT_MO));
+    }
+    out.push({ id, item: r.set + ' ' + r.product, from: a.date, fromPrice: a.v, to: b.date, predicted: Math.round(pred * 100) / 100, actual: b.v, error: pred / b.v - 1 });
+  }
+  return out;
+}
+});
+
+const FACTORS = [
+  { key: 'demand', name: 'Buyer demand', pts: 25, full: 'Collectors and stores are excited about it, so it sells fast' },
+  { key: 'margin', name: 'Store margin room', pts: 20, full: 'Market price is 3× MSRP or more, so stores can resell at a profit. Products only on the resale market get almost none, since the warehouse pays market price' },
+  { key: 'timing', name: 'Launch timing', pts: 15, full: 'Released in the last 45 days or coming soon' },
+  { key: 'priceTrend', name: 'Price direction', pts: 10, full: 'Prices are rising, not falling' },
+  { key: 'print', name: 'Low print risk', pts: 10, full: 'Not overprinted or likely to be reprinted soon' },
+  { key: 'season', name: 'Holiday timing', pts: 10, full: 'On shelves before the Christmas rush' },
+  { key: 'fit', name: 'Store fit', pts: 10, full: 'The product matches what these stores sell: booster boxes and ETBs for hobby shops, single packs and blisters for gas station and vape shop counters' }
+];
+FACTORS.forEach((f, i) => f.color = dash.colors[i % dash.colors.length]);
+const MODES = { all: { score: 'scoreAll', fit: 'fitAll', label: 'the whole route' }, hobby: { score: 'scoreHobby', fit: 'fitHobby', label: 'hobby shops' }, counter: { score: 'scoreCounter', fit: 'fitCounter', label: 'gas stations and vape shops' } };
+let mode = 'all';
+
+const leg = d3.select('#legend');
+FACTORS.forEach(f => { const s = leg.append('span'); s.append('i').style('background', f.color); s.append('span').text(f.name + ' ' + f.pts); });
+const wt = d3.select('#weights-table tbody').selectAll('tr').data(FACTORS).join('tr');
+wt.append('td').each(function (f) { const s = d3.select(this).append('span').attr('class', 'score'); s.append('span').attr('class', 'stack').style('max-width', '10px').append('i').style('width', '100%').style('background', f.color); s.append('span').text(f.name); });
+wt.append('td').attr('class', 'num').text(f => f.pts);
+wt.append('td').attr('class', 'hide-sm').text(f => f.full);
+
+const usd = v => v == null || isNaN(v) ? '—' : '$' + d3.format(',.2f')(v);
+const arrow = t => t > 0 ? '▲ rising' : t < 0 ? '▼ falling' : '● flat';
+function rows(tb, data, cells, key, keyAttr) {
+  const tr = d3.select(tb).select('tbody').selectAll('tr').data(data, key).join('tr').attr('data-key', keyAttr || key);
+  tr.selectAll('td').data(r => cells.map(c => [c, r])).join('td')
+    .attr('class', ([c]) => c.cls || null)
+    .each(function ([c, r]) { c.draw(d3.select(this).text(''), r); });
+}
+
+const FIT_LABEL = { hobby: 'Hobby shops', counter: 'Counters', both: 'Both' };
+const fmtDate = d3.utcFormat('%b %-d, %Y');
+const parseDay = d => new Date(d + 'T00:00:00Z');
+const pct = d3.format('+.1%');
+
+function planFor(list, scoreKey, fitKey, budget, costPct) {
+  const cands = list.filter(r => r[scoreKey] >= 60 && r[fitKey] >= 5 && r.market > 0).map(r => ({ r, s: r[scoreKey], cost: r.market * costPct / 100 }))
+    .sort((a, b) => b.s - a.s);
+  if (!cands.length || !(budget > 0)) return { lines: [], spent: 0 };
+  const cap = budget * 0.3;
+  let w = cands.map(c => Math.pow(c.s - 55, 2));
+  let alloc = new Array(cands.length).fill(0), capped = new Array(cands.length).fill(false), pool = budget;
+  for (let k = 0; k < 6 && pool > 0.01; k++) {
+    const tw = w.reduce((a, v, i) => a + (capped[i] ? 0 : v), 0);
+    if (!tw) break;
+    let next = 0;
+    cands.forEach((c, i) => {
+      if (capped[i]) return;
+      const add = pool * w[i] / tw;
+      if (alloc[i] + add >= cap) { next += alloc[i] + add - cap; alloc[i] = cap; capped[i] = true; } else alloc[i] += add;
+    });
+    pool = next;
+  }
+  const units = cands.map((c, i) => Math.floor(alloc[i] / c.cost));
+  let spent = units.reduce((a, u, i) => a + u * cands[i].cost, 0);
+  let added = true;
+  while (added) {
+    added = false;
+    for (let i = 0; i < cands.length; i++) {
+      const c = cands[i];
+      if (spent + c.cost <= budget + 1e-6 && (units[i] + 1) * c.cost <= cap + 1e-6) { units[i]++; spent += c.cost; added = true; break; }
+    }
+  }
+  const lines = cands.map((c, i) => ({ r: c.r, s: c.s, units: units[i], cost: c.cost, total: units[i] * c.cost })).filter(l => l.units > 0);
+  return { lines, spent };
+}
+
+function renderPlan(list, M) {
+  const budget = Number(document.getElementById('budget').value);
+  const costPct = Number(document.getElementById('costpct').value) || 100;
+  document.getElementById('plan-mode').textContent = 'Planning for ' + M.label + '. Change it with the switch under Rankings.';
+  const { lines, spent } = planFor(list, M.score, M.fit, budget, costPct);
+  document.getElementById('plan-spend').textContent = list.length ? usd(spent) : '—';
+  document.getElementById('plan-left').textContent = list.length && budget > 0 ? usd(Math.max(0, budget - spent)) : '—';
+  document.getElementById('plan-packs').textContent = list.length ? d3.format(',')(lines.reduce((a, l) => a + l.units * (packsOf[l.r.id] || 0), 0)) : '—';
+  document.getElementById('plan-count').textContent = list.length ? String(lines.length) : '—';
+  rows('#plan-table', lines, [
+    { draw: (td, l) => {
+        const w = td.append('div').attr('class', 'prod');
+        const src = (window.PRODUCT_PHOTOS || {})[l.r.id];
+        const ph = w.append('div').attr('class', 'ph' + (src ? '' : ' none')).style('flex-basis', '40px').style('height', '40px');
+        if (src) ph.append('img').attr('src', src).attr('alt', l.r.item); else ph.text('—');
+        const t = w.append('div'); t.append('span').text(l.r.item); t.append('span').attr('class', 'sub').text('Score ' + l.s);
+      } },
+    { cls: 'num', draw: (td, l) => td.text(d3.format(',')(l.units)) },
+    { cls: 'num hide-sm', draw: (td, l) => td.text(usd(l.cost)) },
+    { cls: 'num', draw: (td, l) => td.text(usd(l.total)) },
+    { cls: 'hide-sm', draw: (td, l) => { td.append('span').text(d3.format('.0%')(spent ? l.total / spent : 0)); td.append('span').attr('class', 'share').append('i').style('width', (spent ? l.total / spent * 100 : 0) + '%').style('background', dash.colors[0]); } }
+  ], l => l.r.item, l => l.r.item);
+}
+
+let packsOf = {};
+let histPick = null;
+function renderHistory() {
+  const h = dash.data('history');
+  const box = d3.select('#hist-chart');
+  const sel = document.getElementById('hist-pick');
+  if (h.status !== 'ok') { box.selectAll('*').remove(); return; }
+  const by = d3.group(h.data, r => r.id);
+  const ids = Array.from(by.keys()).sort((a, b) => (by.get(b).length - by.get(a).length) || by.get(a)[0].item.localeCompare(by.get(b)[0].item));
+  if (!histPick || !by.has(histPick)) histPick = ids[0];
+  if (sel.options.length !== ids.length) {
+    sel.replaceChildren(...ids.map(id => new Option(by.get(id)[0].item + ' (' + by.get(id).length + ')', id)));
+  }
+  sel.value = histPick;
+  const pts = by.get(histPick).map(r => ({ d: parseDay(r.date), v: Number(r.market), date: r.date })).sort((a, b) => a.d - b.d);
+  document.getElementById('hist-count').textContent = (pts.length === 1 ? '1 saved price so far' : pts.length + ' saved prices') + ' · dashed line is the forecast';
+  box.selectAll('*').remove();
+  const W = box.node().clientWidth || 600, H = 240;
+  const svg = box.append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+  const fcRow = dash.data('forecast').status === 'ok' ? dash.data('forecast').data.find(r => r.id === histPick) : null;
+  const last = pts[pts.length - 1];
+  const fpts = fcRow ? [{ d: last.d, v: last.v }, { d: new Date(+last.d + 30 * 864e5), v: fcRow.pred30, f: '30-day forecast' }, { d: new Date(+last.d + 90 * 864e5), v: fcRow.pred90, f: '90-day forecast' }] : [];
+  const y = d3.scaleLinear(d3.extent([...pts, ...fpts], p => p.v).map((v, i) => i ? v * 1.08 : v * 0.92), [H - 28, 12]).nice();
+  const yAxis = svg.append('g').call(d3.axisLeft(y).ticks(5).tickFormat(v => '$' + d3.format(',')(v)).tickSize(0)).attr('font-size', null).attr('font-family', null);
+  yAxis.select('.domain').remove();
+  yAxis.selectAll('text').attr('fill', 'var(--color-fg-muted)').style('font-size', 'var(--cds-font-size-caption)');
+  let ml = 8; yAxis.selectAll('text').each(function () { ml = Math.max(ml, this.getComputedTextLength() + 10); });
+  yAxis.attr('transform', `translate(${ml},0)`);
+  const x0 = pts[0].d, x1 = fpts.length ? fpts[2].d : (pts.length > 1 ? last.d : new Date(+x0 + 7 * 864e5));
+  const x = d3.scaleUtc([x0, x1], [ml + 12, W - 16]);
+  svg.append('g').selectAll('line').data(y.ticks(5)).join('line').attr('x1', ml + 4).attr('x2', W - 8).attr('y1', d => y(d)).attr('y2', d => y(d)).attr('stroke', 'var(--cds-chart-grid)');
+  const xAxis = svg.append('g').attr('transform', `translate(0,${H - 22})`).call(d3.axisBottom(x).ticks(Math.max(2, Math.floor(W / 110))).tickFormat(d3.utcFormat('%b %-d')).tickSize(0)).attr('font-size', null).attr('font-family', null);
+  xAxis.select('.domain').attr('stroke', 'var(--cds-chart-axis)');
+  xAxis.selectAll('text').attr('fill', 'var(--color-fg-muted)').attr('dy', '1em').style('font-size', 'var(--cds-font-size-caption)');
+  if (pts.length > 1) svg.append('path').datum(pts).attr('fill', 'none').attr('stroke', dash.colors[0]).attr('stroke-width', 2).attr('stroke-linejoin', 'round').attr('stroke-linecap', 'round').attr('d', d3.line(p => x(p.d), p => y(p.v)));
+  if (fpts.length) svg.append('path').datum(fpts).attr('class', 'dash-line').attr('fill', 'none').attr('stroke', dash.colors[1]).attr('stroke-width', 2).attr('d', d3.line(p => x(p.d), p => y(p.v)));
+  const tip = box.append('div').attr('class', 'tip').style('display', 'none');
+  const allPts = [...pts, ...fpts.slice(1)];
+  svg.append('g').selectAll('circle').data(allPts).join('circle').attr('cx', p => x(p.d)).attr('cy', p => y(p.v)).attr('r', 4).attr('fill', p => p.f ? 'var(--color-panel)' : dash.colors[0]).attr('stroke', p => p.f ? dash.colors[1] : 'none').attr('stroke-width', 2)
+    .on('mouseenter', (e, p) => {
+      tip.style('display', null).html('');
+      tip.append('span').text(fmtDate(p.d) + (p.f ? ' · ' + p.f : '')); tip.append('div').text(usd(p.v));
+      const tw = tip.node().offsetWidth, px = x(p.d) / W * box.node().clientWidth;
+      tip.style('left', Math.min(Math.max(0, px - tw / 2), box.node().clientWidth - tw) + 'px').style('top', Math.max(0, y(p.v) - 52) + 'px');
+    })
+    .on('mouseleave', () => tip.style('display', 'none'));
+
+  const mv = dash.data('movers');
+  rows('#movers-table', mv.status === 'ok' ? mv.data.slice(0, 12) : [], [
+    { draw: (td, r) => td.text(r.item) },
+    { cls: 'hide-sm', draw: (td, r) => td.text(fmtDate(parseDay(r.fromDate))) },
+    { cls: 'num hide-sm', draw: (td, r) => td.text(usd(r.fromPrice)) },
+    { cls: 'num', draw: (td, r) => td.text(usd(r.toPrice)) },
+    { cls: 'num', draw: (td, r) => td.text(pct(r.change)).classed('up', r.change > 0).classed('dn', r.change < 0) }
+  ], r => r.id);
+}
+
+function renderForecast() {
+  const f = dash.data('forecast');
+  rows('#fc-table', f.status === 'ok' ? f.data : [], [
+    { draw: (td, r) => { td.append('span').text(r.item); td.append('span').attr('class', 'sub').text('Confidence: ' + r.confidence + (r.usesHistory ? ' · uses its price history' : '')); } },
+    { cls: 'num hide-sm', draw: (td, r) => td.text(usd(r.now)) },
+    { cls: 'num', draw: (td, r) => { td.append('span').text(usd(r.pred30)); td.append('span').attr('class', 'sub ' + (r.change30 > 0.005 ? 'up' : r.change30 < -0.005 ? 'dn' : '')).text(pct(r.change30)); } },
+    { cls: 'num', draw: (td, r) => { td.append('span').text(usd(r.pred90)); td.append('span').attr('class', 'sub ' + (r.change90 > 0.005 ? 'up' : r.change90 < -0.005 ? 'dn' : '')).text(pct(r.change90)); } },
+    { draw: (td, r) => td.text(r.call) }
+  ], r => r.id);
+  const b = dash.data('backtest');
+  const bl = b.status === 'ok' ? b.data : [];
+  rows('#bt-table', bl, [
+    { draw: (td, r) => td.text(r.item) },
+    { cls: 'hide-sm', draw: (td, r) => td.text(fmtDate(parseDay(r.from)) + ' at ' + usd(r.fromPrice)) },
+    { cls: 'num', draw: (td, r) => td.text(usd(r.predicted)) },
+    { cls: 'num', draw: (td, r) => td.text(usd(r.actual)) },
+    { cls: 'num', draw: (td, r) => td.text(pct(r.error)).classed('dn', Math.abs(r.error) > 0.1) }
+  ], r => r.id);
+  const within = bl.filter(r => Math.abs(r.error) <= 0.1).length;
+  document.getElementById('bt-note').textContent = bl.length ? within + ' of ' + bl.length + ' checks landed within 10% of the real price. Misses usually come from special sets with no booster box, which can keep rising after launch.' : '';
+}
+
+function renderCalendar() {
+  const c = dash.data('releases');
+  const today = new Date(); today.setUTCHours(0, 0, 0, 0);
+  const list = c.status === 'ok' ? c.data.filter(r => parseDay(r.date) >= new Date(+today - 3 * 864e5)).sort((a, b) => a.date < b.date ? -1 : 1) : [];
+  rows('#cal-table', list, [
+    { draw: (td, r) => { const d = parseDay(r.date), days = Math.round((d - today) / 864e5);
+        td.append('span').text(d3.utcFormat('%b %-d')(d));
+        td.append('span').attr('class', 'sub' + (days >= 0 && days <= 14 ? ' soon' : '')).text(days < 0 ? 'Out now' : days === 0 ? 'Today' : 'In ' + days + ' days'); } },
+    { draw: (td, r) => { td.append('span').text(r.product + (r.lang === 'JP' ? ' (Japan)' : '')); td.append('span').attr('class', 'sub').text(r.type + ' · ' + r.note); } },
+    { cls: 'num hide-sm', draw: (td, r) => td.text(r.msrp == null ? '—' : usd(Number(r.msrp))) },
+    { draw: (td, r) => td.append('span').attr('class', 'badge').text(FIT_LABEL[r.storeFit] || r.storeFit) }
+  ], r => r.id);
+}
+
+function render() {
+  const M = MODES[mode];
+  document.getElementById('score-th').setAttribute('data-field', M.score);
+  document.getElementById('top-item').setAttribute('data-where', 'mode=' + mode);
+  document.getElementById('top-score').setAttribute('data-where', 'mode=' + mode);
+  d3.selectAll('#mode-seg button').attr('aria-pressed', function () { return String(this.dataset.mode === mode); });
+
+  const b = dash.data('buylist'), t = dash.data('top'), s = dash.data('summary');
+  const tr = t.status === 'ok' ? t.data.find(r => r.mode === mode) : null;
+  document.getElementById('top-item').textContent = tr && tr.item ? tr.item : '—';
+  document.getElementById('top-score').textContent = tr && tr.score != null ? String(tr.score) : '—';
+  const sr = s.status === 'ok' && s.data[0];
+  document.querySelector('[data-source="summary"][data-field="avgPremium"]').textContent = sr && sr.avgPremium != null ? d3.format('.1f')(sr.avgPremium) + '×' : '—';
+  document.querySelector('[data-source="summary"][data-field="count"]').textContent = sr ? String(sr.count) : '—';
+  document.getElementById('takeaway').textContent = tr && tr.item
+    ? 'For ' + M.label + ', lead with ' + tr.item + ' (' + tr.opinion.charAt(0).toLowerCase() + tr.opinion.slice(1) + '). Buy light on anything scoring under 50.'
+    : '—';
+
+  const list = b.status === 'ok' ? b.data.slice().sort((x, y) => y[M.score] - x[M.score] || y.market - x.market) : [];
+  const sd = dash.data('sealed');
+  if (sd.status === 'ok') packsOf = Object.fromEntries(sd.data.map(r => [r.id, Number(r.packs) || 0]));
+  renderPlan(list, M);
+  renderHistory();
+  renderForecast();
+  renderCalendar();
+  rows('#buy-table', list, [
+    { draw: (td, r) => {
+        const w = td.append('div').attr('class', 'prod');
+        const src = (window.PRODUCT_PHOTOS || {})[r.id];
+        const ph = w.append('div').attr('class', 'ph' + (src ? '' : ' none'));
+        if (src) ph.append('img').attr('src', src).attr('alt', r.item).attr('loading', 'lazy'); else ph.text('No photo');
+        const t = w.append('div');
+        t.append('span').text(r.item); t.append('span').attr('class', 'sub').text(r.lang + ' · ' + r.opinion);
+      } },
+    { cls: 'num', draw: (td, r) => td.text(usd(r.market)) },
+    { cls: 'num hide-sm', draw: (td, r) => td.text(r.premium == null ? '—' : d3.format('.1f')(r.premium) + '×') },
+    { draw: (td, r) => {
+        const w = td.append('div').attr('class', 'score');
+        w.append('b').text(r[M.score]).classed('up', r[M.score] >= 70).classed('dn', r[M.score] < 50);
+        const st = w.append('span').attr('class', 'stack');
+        FACTORS.forEach(f => { const v = f.key === 'fit' ? r[M.fit] : r[f.key]; st.append('i').style('width', v + '%').style('background', f.color); });
+      } }
+  ], r => r.item);
+
+  const c = dash.data('chase');
+  rows('#chase-table', c.status === 'ok' ? c.data : [], [
+    { draw: (td, r) => { td.append('span').text(r.card); td.append('span').attr('class', 'sub').text(r.set + ' · ' + r.note); } },
+    { cls: 'num', draw: (td, r) => td.text(usd(Number(r.price))) },
+    { cls: 'num', draw: (td, r) => td.text(arrow(Number(r.trend))).classed('up', r.trend > 0).classed('dn', r.trend < 0) }
+  ], r => r.card);
+
+  const p = dash.data('pulls');
+  rows('#pull-table', p.status === 'ok' ? p.data : [], [
+    { draw: (td, r) => td.text(r.set) },
+    { draw: (td, r) => { td.append('span').text(r.tier); td.append('span').attr('class', 'sub').text(r.lang + ' · ' + r.basis); } },
+    { cls: 'num', draw: (td, r) => td.text(d3.format(',')(Number(r.oneIn))) }
+  ], r => r.set + ',' + r.tier, r => encodeURIComponent(r.set) + ',' + encodeURIComponent(r.tier));
+}
+document.querySelectorAll('#mode-seg button').forEach(btn => btn.addEventListener('click', () => { mode = btn.dataset.mode; render(); }));
+document.getElementById('budget').addEventListener('input', render);
+document.getElementById('costpct').addEventListener('input', render);
+document.getElementById('hist-pick').addEventListener('change', e => { histPick = e.target.value; render(); });
+dash.onData(render);
+const named = location.hash && document.getElementById(location.hash.slice(1));
+if (named) setTimeout(() => named.scrollIntoView(), 300);
+document.querySelectorAll('.pw .nav a').forEach(a => a.addEventListener('click', e => { e.preventDefault(); const el = document.getElementById(a.getAttribute('href').slice(1)); if (el) { el.scrollIntoView({ behavior: 'smooth' }); dash.setLink(el.id); } }));
+</script>
+
+</div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
