@@ -155,6 +155,8 @@ body{margin:0;background:var(--color-bg);color:var(--color-fg);font-family:var(-
 .pw .cl-in{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr));gap:var(--cds-gap-sm);margin-bottom:var(--cds-gap-sm)}
 .pw .cl-in label{display:flex;flex-direction:column;gap:2px;font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
 .pw .cl-in input{font:inherit;font-size:var(--cds-font-size-body);color:var(--color-fg);background:var(--color-panel);border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:4px 8px;width:100%;box-sizing:border-box;font-variant-numeric:tabular-nums}
+.pw .auto-row{display:flex;align-items:center;gap:6px;margin-top:4px;color:var(--color-fg-muted)}
+.pw .auto-row input{width:auto;margin:0}
 .pw .cl-out{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr));gap:var(--cds-gap-xs) var(--cds-gap-sm)}
 .pw .cl-out div{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
 .pw .cl-out b{display:block;font-size:var(--cds-font-size-body);color:var(--color-fg);font-weight:var(--cds-font-weight-medium);font-variant-numeric:tabular-nums}
@@ -209,11 +211,10 @@ body{margin:0;background:var(--color-bg);color:var(--color-fg);font-family:var(-
 
   <section class="card" id="deal-calc">
     <h2>Cost &amp; margin calculator</h2>
-    <p class="note">Pick a product from the drop-down to see everything the tracker knows about it: prices, buyer opinion, print risk, its buy score broken into all seven factors, and the forecast. Then type in what the warehouse pays per unit, how many units, the margin you want and what you plan to sell it for. Every box is editable. It shows the price you need to hit your margin, what the product sells for now and later, and how much room the store has left. Numbers here reset when the page reloads.</p>
+    <p class="note">Pick a product from the drop-down to see everything the tracker knows about it: prices, buyer opinion, print risk, its buy score broken into all seven factors, and the forecast. Then type in what the warehouse pays per unit, how many units and the margin you want. The sell price fills in on its own from your cost and margin; type over it to set your own. Every box is editable. It shows the price you need to hit your margin, what the product sells for now and later, and how much room the store has left. Numbers here reset when the page reloads.</p>
     <div class="calc-glob">
       <label class="field">Extra cost per unit (shipping, fees) $<input id="calc-extra" type="number" min="0" step="0.01" value="0" inputmode="decimal"></label>
       <label class="field">Starting cost, % of MSRP <input id="calc-costpct" class="pct" type="number" min="1" max="200" step="1" value="60" inputmode="numeric"></label>
-      <label class="field">Starting sell price, % of market <input id="calc-sellpct" class="pct" type="number" min="1" max="200" step="1" value="75" inputmode="numeric"></label>
       <label class="field">Starting margin % <input id="calc-margin" class="pct" type="number" min="0" max="95" step="1" value="25" inputmode="numeric"></label>
     </div>
     <div class="calc-lines" id="calc-lines" data-source="sealed forecast"></div>
@@ -233,7 +234,7 @@ body{margin:0;background:var(--color-bg);color:var(--color-fg);font-family:var(-
       <div>Overall margin<b id="ct-margin">—</b></div>
       <div>Lines hitting margin<b id="ct-hit">—</b></div>
     </div>
-    <p class="muted">Margin is profit as a share of your sell price (a 25% margin on a $10 cost means selling at $13.33). Markup, shown per line, is profit as a share of your cost. Starting costs are placeholders: replace them with the warehouse's real invoice prices.</p>
+    <p class="muted">Margin is profit as a share of your sell price (a 25% margin on a $10 cost means selling at $13.33). Markup, shown per line, is profit as a share of your cost. Starting costs are placeholders (a percentage of MSRP): replace them with the warehouse's real invoice prices.</p>
   </section>
 
   <section class="card" id="buy-ranking">
@@ -694,10 +695,9 @@ const calc = { lines: [], uid: 0, products: [], byId: {}, fc: {}, ready: false }
 const num = (el) => { const v = parseFloat(el.value); return isFinite(v) ? v : null; };
 const gval = (id) => num(document.getElementById(id));
 function startCost(p) { const pctv = (gval('calc-costpct') ?? 60) / 100; return Math.round(((p.msrp || p.market) * pctv) * 100) / 100; }
-function startSell(p) { const pctv = (gval('calc-sellpct') ?? 75) / 100; return Math.round(p.market * pctv * 100) / 100; }
 function addLine(id, units) {
   const p = calc.byId[id]; if (!p) return;
-  calc.lines.push({ uid: ++calc.uid, id, cost: startCost(p), units: units || 12, margin: gval('calc-margin') ?? 25, sell: startSell(p) });
+  calc.lines.push({ uid: ++calc.uid, id, cost: startCost(p), units: units || 12, margin: gval('calc-margin') ?? 25, sell: null, auto: true });
 }
 function lineMath(l) {
   const p = calc.byId[l.id], f = calc.fc[l.id] || {};
@@ -705,7 +705,7 @@ function lineMath(l) {
   const landed = (l.cost || 0) + extra;
   const m = Math.min(0.95, Math.max(0, (l.margin || 0) / 100));
   const needed = landed / (1 - m);
-  const sell = l.sell || 0, units = l.units || 0;
+  const sell = l.auto ? Math.round(needed * 100) / 100 : (l.sell || 0), units = l.units || 0;
   const profit = sell - landed;
   return { p, f, extra, landed, m, needed, sell, units, profit, totalCost: landed * units, revenue: sell * units, totalProfit: profit * units,
     margin: sell > 0 ? profit / sell : null, markup: landed > 0 ? profit / landed : null, maxCost: sell * (1 - m) - extra,
@@ -722,7 +722,7 @@ function buildCalc() {
     const sel = document.createElement('select'); sel.setAttribute('aria-label', 'Product');
     for (const p of calc.products) sel.append(new Option(p.item, p.id));
     sel.value = l.id;
-    sel.addEventListener('change', () => { const p = calc.byId[sel.value]; l.id = sel.value; l.cost = startCost(p); l.sell = startSell(p); buildCalc(); });
+    sel.addEventListener('change', () => { const p = calc.byId[sel.value]; l.id = sel.value; l.cost = startCost(p); l.auto = true; buildCalc(); });
     const x = document.createElement('button'); x.className = 'cl-x'; x.type = 'button'; x.textContent = 'Remove'; x.setAttribute('aria-label', 'Remove product');
     x.addEventListener('click', () => { calc.lines = calc.lines.filter(z => z.uid !== l.uid); buildCalc(); });
     head.append(sel, x);
@@ -737,7 +737,16 @@ function buildCalc() {
     field('Your cost per unit ($)', 'cost', '0.01');
     field('Units', 'units', '1');
     field('Target margin (%)', 'margin', '1');
-    field('Your sell price per unit ($)', 'sell', '0.01');
+    {
+      const lab = document.createElement('label'); lab.textContent = 'Your sell price per unit ($)';
+      const inp = document.createElement('input'); inp.type = 'number'; inp.min = '0'; inp.step = '0.01'; inp.inputMode = 'decimal'; inp.className = 'sell-in';
+      inp.addEventListener('input', () => { l.auto = false; l.sell = num(inp); const cb = card.querySelector('.auto-cb'); if (cb) cb.checked = false; updateCalc(); });
+      const row = document.createElement('span'); row.className = 'auto-row';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.className = 'auto-cb'; cb.checked = !!l.auto;
+      cb.addEventListener('change', () => { l.auto = cb.checked; if (!l.auto) l.sell = lineMath(l).sell; updateCalc(); });
+      const t = document.createElement('span'); t.textContent = 'Auto: set from cost and margin';
+      row.append(cb, t); lab.append(inp, row); ins.append(lab);
+    }
     const out = document.createElement('div'); out.className = 'cl-out';
     const ver = document.createElement('div'); ver.className = 'cl-verdict';
     const yours = document.createElement('div'); yours.className = 'cl-sec'; yours.textContent = 'Your numbers';
@@ -802,6 +811,8 @@ function updateCalc() {
   for (const l of calc.lines) {
     const card = document.querySelector(`#calc-lines .cl[data-uid="${l.uid}"]`); if (!card) continue;
     const r = lineMath(l);
+    const sin = card.querySelector('.sell-in');
+    if (sin && document.activeElement !== sin && (l.auto || sin.value === '')) sin.value = r.sell ? r.sell.toFixed(2) : '';
     units += r.units; packs += r.units * (r.p.packs || 0); cost += r.totalCost; rev += r.revenue; profit += r.totalProfit; if (r.hits && r.units > 0) hit++;
     const out = card.querySelector('.cl-out'); out.replaceChildren();
     outCell(out, 'Price needed for ' + d3.format('.0f')(r.m * 100) + '% margin', usd(r.needed));
@@ -857,8 +868,8 @@ document.getElementById('calc-plan').addEventListener('click', () => {
   document.getElementById('deal-calc').scrollIntoView({ behavior: 'smooth' });
 });
 ['calc-extra'].forEach(id => document.getElementById(id).addEventListener('input', updateCalc));
-['calc-costpct', 'calc-sellpct', 'calc-margin'].forEach(id => document.getElementById(id).addEventListener('change', () => {
-  calc.lines.forEach(l => { const p = calc.byId[l.id]; if (!p) return; if (id === 'calc-costpct') l.cost = startCost(p); if (id === 'calc-sellpct') l.sell = startSell(p); if (id === 'calc-margin') l.margin = gval('calc-margin') ?? l.margin; });
+['calc-costpct', 'calc-margin'].forEach(id => document.getElementById(id).addEventListener('change', () => {
+  calc.lines.forEach(l => { const p = calc.byId[l.id]; if (!p) return; if (id === 'calc-costpct') l.cost = startCost(p); if (id === 'calc-margin') l.margin = gval('calc-margin') ?? l.margin; });
   buildCalc();
 }));
 document.getElementById('calc-copy').addEventListener('click', async () => {
