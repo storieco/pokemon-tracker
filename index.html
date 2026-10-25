@@ -132,10 +132,26 @@ body{margin:0;background:var(--color-bg);color:var(--color-fg);font-family:var(-
 .pw .soon{color:var(--color-warn)}
 .pw .calc-glob{display:flex;flex-wrap:wrap;gap:var(--cds-gap-sm) var(--cds-gap-lg);margin-bottom:var(--cds-gap-md);font-size:var(--cds-font-size-caption)}
 .pw .calc-lines{display:flex;flex-direction:column;gap:var(--cds-gap-md)}
-.pw .cl{border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:var(--cds-pad-md);background:var(--color-bg)}
+.pw .cl{border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:var(--cds-pad-md, 12px);background:var(--color-bg)}
 .pw .cl-head{display:flex;gap:var(--cds-gap-sm);align-items:center;margin-bottom:var(--cds-gap-sm)}
 .pw .cl-head select{flex:1;min-width:0;font:inherit;color:var(--color-fg);background:var(--color-panel);border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:4px 8px}
 .pw .cl-x{font:inherit;background:transparent;border:1px solid var(--color-border-line);border-radius:var(--cds-radius);color:var(--color-fg-muted);cursor:pointer;padding:2px 10px}
+.pw .cl-det{display:flex;gap:var(--cds-gap-md);align-items:flex-start;border-top:1px solid var(--color-border-line);border-bottom:1px solid var(--color-border-line);padding:var(--cds-gap-sm) 0;margin:0 0 var(--cds-gap-sm)}
+.pw .cl-det .ph{flex:0 0 84px;height:84px}
+.pw .cl-det-body{flex:1;min-width:0}
+.pw .cl-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,8.5rem),1fr));gap:var(--cds-gap-xs) var(--cds-gap-sm)}
+.pw .cl-facts div{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
+.pw .cl-facts b{display:block;font-size:var(--cds-font-size-body);color:var(--color-fg);font-weight:var(--cds-font-weight-medium)}
+.pw .cl-op{font-size:var(--cds-font-size-caption);margin:var(--cds-gap-sm) 0 0}
+.pw .cl-src{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);margin:2px 0 0}
+.pw .cl-fac{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr));gap:4px var(--cds-gap-md);margin-top:var(--cds-gap-sm)}
+.pw .cl-fac div{display:flex;align-items:center;gap:6px;font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
+.pw .cl-fac .bar{flex:0 0 60px;height:6px;border-radius:3px;background:var(--cds-chart-grid);overflow:hidden}
+.pw .cl-fac .bar i{display:block;height:100%}
+.pw .cl-fac span:nth-child(2){white-space:nowrap}
+.pw .cl-fac span.v{margin-left:auto;white-space:nowrap;color:var(--color-fg);font-variant-numeric:tabular-nums}
+.pw .cl-sec{font-size:var(--cds-font-size-caption);font-weight:var(--cds-font-weight-medium);color:var(--color-fg);margin:var(--cds-gap-sm) 0 4px}
+@media (max-width:560px){.pw .cl-det{flex-direction:column}.pw .cl-det .ph{flex-basis:auto;width:84px}}
 .pw .cl-in{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr));gap:var(--cds-gap-sm);margin-bottom:var(--cds-gap-sm)}
 .pw .cl-in label{display:flex;flex-direction:column;gap:2px;font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
 .pw .cl-in input{font:inherit;font-size:var(--cds-font-size-body);color:var(--color-fg);background:var(--color-panel);border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:4px 8px;width:100%;box-sizing:border-box;font-variant-numeric:tabular-nums}
@@ -193,7 +209,7 @@ body{margin:0;background:var(--color-bg);color:var(--color-fg);font-family:var(-
 
   <section class="card" id="deal-calc">
     <h2>Cost &amp; margin calculator</h2>
-    <p class="note">Pick a product, then type in what the warehouse pays per unit, how many units, the margin you want and what you plan to sell it for. Every box is editable. It shows the price you need to hit your margin, what the product sells for now and later, and how much room the store has left. Numbers here reset when the page reloads.</p>
+    <p class="note">Pick a product from the drop-down to see everything the tracker knows about it: prices, buyer opinion, print risk, its buy score broken into all seven factors, and the forecast. Then type in what the warehouse pays per unit, how many units, the margin you want and what you plan to sell it for. Every box is editable. It shows the price you need to hit your margin, what the product sells for now and later, and how much room the store has left. Numbers here reset when the page reloads.</p>
     <div class="calc-glob">
       <label class="field">Extra cost per unit (shipping, fees) $<input id="calc-extra" type="number" min="0" step="0.01" value="0" inputmode="decimal"></label>
       <label class="field">Starting cost, % of MSRP <input id="calc-costpct" class="pct" type="number" min="1" max="200" step="1" value="60" inputmode="numeric"></label>
@@ -710,6 +726,7 @@ function buildCalc() {
     const x = document.createElement('button'); x.className = 'cl-x'; x.type = 'button'; x.textContent = 'Remove'; x.setAttribute('aria-label', 'Remove product');
     x.addEventListener('click', () => { calc.lines = calc.lines.filter(z => z.uid !== l.uid); buildCalc(); });
     head.append(sel, x);
+    const det = productDetails(l.id);
     const ins = document.createElement('div'); ins.className = 'cl-in';
     const field = (label, key, step) => {
       const lab = document.createElement('label'); lab.textContent = label;
@@ -723,10 +740,61 @@ function buildCalc() {
     field('Your sell price per unit ($)', 'sell', '0.01');
     const out = document.createElement('div'); out.className = 'cl-out';
     const ver = document.createElement('div'); ver.className = 'cl-verdict';
-    card.append(head, ins, out, ver);
+    const yours = document.createElement('div'); yours.className = 'cl-sec'; yours.textContent = 'Your numbers';
+    card.append(head, det, yours, ins, out, ver);
     host.append(card);
   }
   updateCalc();
+}
+const TYPE_LABEL = { box: 'Booster box', etb: 'Elite Trainer Box', bundle: 'Booster bundle', counter: 'Counter item (packs, blisters, tins)', kit: 'Collection / Build & Battle box' };
+const RISK_LABEL = ['Low (out of print)', 'Normal', 'High (overprinted)'];
+const MOOD_LABEL = ['Very negative', 'Negative', 'Neutral', 'Positive', 'Very positive'];
+function productDetails(id) {
+  const p = calc.byId[id], b = p.b || {}, s = p.s || {}, f = calc.fc[id] || {}, M = MODES[mode];
+  const wrap = document.createElement('div'); wrap.className = 'cl-det';
+  const src = (window.PRODUCT_PHOTOS || {})[id];
+  const ph = document.createElement('div'); ph.className = 'ph' + (src ? '' : ' none');
+  if (src) { const im = document.createElement('img'); im.src = src; im.alt = p.item; ph.append(im); } else ph.textContent = 'No photo';
+  const body = document.createElement('div'); body.className = 'cl-det-body';
+  const facts = document.createElement('div'); facts.className = 'cl-facts';
+  const fact = (label, value, cls) => outCell(facts, label, value == null || value === '' ? '—' : value, cls);
+  const sm = Number(s.sentiment), tr = Number(s.trend), rk = Number(s.printRisk);
+  fact('Set', (s.set || '') + (s.lang === 'JP' ? ' (Japan)' : ''));
+  fact('Type', TYPE_LABEL[s.channel] || s.channel);
+  fact('Where to buy', p.supply === 'secondary' ? 'Resale market only' : 'Distributor');
+  fact('Set kind', f.special ? 'Special (no booster box)' : 'Main set');
+  fact('Packs', p.packs ? String(p.packs) : null);
+  fact('MSRP', p.msrp != null ? usd(p.msrp) : null);
+  fact('Market price', usd(p.market));
+  fact('Price date', s.asOf ? fmtDate(parseDay(s.asOf)) : null);
+  fact('Market vs MSRP', b.premium != null ? d3.format('.1f')(b.premium) + '×' : null);
+  fact('Market per pack', p.packs ? usd(p.market / p.packs) : null);
+  fact('Released', s.releaseDate ? fmtDate(parseDay(s.releaseDate)) + (b.daysSinceRelease != null ? (b.daysSinceRelease < 0 ? ' (in ' + (-b.daysSinceRelease) + ' days)' : '') : '') : 'Unknown');
+  fact('Price trend', isFinite(tr) ? arrow(tr) : null, tr > 0 ? 'up' : tr < 0 ? 'dn' : '');
+  fact('Buyer opinion', isFinite(sm) ? MOOD_LABEL[sm + 2] : null, sm > 0 ? 'up' : sm < 0 ? 'dn' : '');
+  fact('Print risk', isFinite(rk) ? RISK_LABEL[rk] : null, rk >= 2 ? 'dn' : '');
+  fact('Buy score (' + M.label + ')', b[M.score] != null ? b[M.score] + ' / 100' : null, b[M.score] >= 70 ? 'up' : b[M.score] < 50 ? 'dn' : '');
+  fact('30-day forecast', f.pred30 != null ? usd(f.pred30) + ' (' + pct(f.change30) + ')' : null, f.change30 > 0.005 ? 'up' : f.change30 < -0.005 ? 'dn' : '');
+  fact('90-day forecast', f.pred90 != null ? usd(f.pred90) + ' (' + pct(f.change90) + ')' : null, f.change90 > 0.005 ? 'up' : f.change90 < -0.005 ? 'dn' : '');
+  fact('Forecast call', f.call ? f.call.split(':')[0] : null);
+  fact('Forecast confidence', f.confidence ? f.confidence + (f.usesHistory ? ', uses price history' : '') : null);
+  body.append(facts);
+  if (s.opinion) { const o = document.createElement('p'); o.className = 'cl-op'; o.textContent = 'What buyers are saying: ' + s.opinion; body.append(o); }
+  if (f.call) { const o = document.createElement('p'); o.className = 'cl-src'; o.textContent = 'Forecast advice: ' + f.call + '.'; body.append(o); }
+  const st = document.createElement('div'); st.className = 'cl-sec'; st.textContent = 'Buy score factors (' + M.label + ')'; body.append(st);
+  const fac = document.createElement('div'); fac.className = 'cl-fac';
+  for (const F of FACTORS) {
+    const v = F.key === 'fit' ? b[M.fit] : b[F.key];
+    const row = document.createElement('div');
+    const nm = document.createElement('span'); nm.textContent = F.name;
+    const bar = document.createElement('span'); bar.className = 'bar'; const fill = document.createElement('i'); fill.style.width = (v != null ? Math.max(0, Math.min(100, v / F.pts * 100)) : 0) + '%'; fill.style.background = F.color; bar.append(fill);
+    const val = document.createElement('span'); val.className = 'v'; val.textContent = (v != null ? d3.format('.1~f')(v) : '—') + ' / ' + F.pts;
+    row.append(bar, nm, val); fac.append(row);
+  }
+  body.append(fac);
+  if (s.source) { const o = document.createElement('p'); o.className = 'cl-src'; o.textContent = 'Price source: ' + s.source; body.append(o); }
+  wrap.append(ph, body);
+  return wrap;
 }
 function outCell(parent, label, value, cls) { const d = document.createElement('div'); d.textContent = label; const b = document.createElement('b'); b.textContent = value; if (cls) b.className = cls; d.append(b); parent.append(d); }
 function updateCalc() {
@@ -767,7 +835,7 @@ function calcData(list) {
   const sd = dash.data('sealed'), fd = dash.data('forecast');
   if (sd.status !== 'ok' || !list.length) return;
   const info = Object.fromEntries(sd.data.map(r => [r.id, r]));
-  calc.products = list.map(r => ({ id: r.id, item: r.item, market: Number(r.market), msrp: r.msrp == null ? null : Number(r.msrp), packs: Number((info[r.id] || {}).packs) || 0, supply: (info[r.id] || {}).supply || 'distributor' }))
+  calc.products = list.map(r => ({ id: r.id, item: r.item, market: Number(r.market), msrp: r.msrp == null ? null : Number(r.msrp), packs: Number((info[r.id] || {}).packs) || 0, supply: (info[r.id] || {}).supply || 'distributor', b: r, s: info[r.id] || {} }))
     .sort((a, b) => a.item.localeCompare(b.item));
   calc.byId = Object.fromEntries(calc.products.map(p => [p.id, p]));
   calc.fc = fd.status === 'ok' ? Object.fromEntries(fd.data.map(r => [r.id, r])) : {};
