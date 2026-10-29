@@ -120,6 +120,7 @@ body{margin:0;background:var(--color-bg);color:var(--color-fg);font-family:var(-
 .pw .field input,.pw .field select{font:inherit;font-size:var(--cds-font-size-body);color:var(--color-fg);background:var(--color-bg);border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:4px 8px}
 .pw .field input{width:8rem}
 .pw .field input.pct{width:4.5rem}
+.pw .field input[type=checkbox]{width:auto;padding:0;margin:0}
 .pw .totals{display:flex;flex-wrap:wrap;gap:var(--cds-gap-lg);margin:var(--cds-gap-sm) 0 var(--cds-gap-md)}
 .pw .totals div{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
 .pw .totals b{display:block;font-family:var(--font-anthropic-serif);font-weight:400;font-size:var(--cds-font-size-heading);color:var(--color-fg);font-variant-numeric:tabular-nums}
@@ -176,7 +177,7 @@ body{margin:0;background:var(--color-bg);color:var(--color-fg);font-family:var(-
     <h1>Pokémon wholesale buy board</h1>
     <p class="lede" id="takeaway">—</p>
     <nav class="nav" aria-label="Sections" style="margin-top:var(--cds-gap-sm)">
-      <a href="#buy-plan">Buy plan</a><a href="#deal-calc">Cost &amp; margin</a><a href="#buy-ranking">Rankings</a><a href="#price-history">Price history</a><a href="#price-forecast">Forecast</a><a href="#release-calendar">Release calendar</a><a href="#hot-cards">Hot cards</a>
+      <a href="#buy-plan">Buy plan</a><a href="#deal-calc">Cost &amp; margin</a><a href="#retail-guide">Retail prices</a><a href="#buy-ranking">Rankings</a><a href="#price-history">Price history</a><a href="#price-forecast">Forecast</a><a href="#release-calendar">Release calendar</a><a href="#hot-cards">Hot cards</a>
     </nav>
   </header>
 
@@ -235,6 +236,34 @@ body{margin:0;background:var(--color-bg);color:var(--color-fg);font-family:var(-
       <div>Lines hitting margin<b id="ct-hit">—</b></div>
     </div>
     <p class="muted">Margin is profit as a share of your sell price (a 25% margin on a $10 cost means selling at $13.33). Markup, shown per line, is profit as a share of your cost. Starting costs are placeholders (a percentage of MSRP): replace them with the warehouse's real invoice prices.</p>
+  </section>
+
+  <section class="card" id="retail-guide">
+    <h2>Retail price guide</h2>
+    <p class="note">What a store could put on the shelf for each product. MSRP is Pokémon's suggested retail price. Market price is what collectors are paying online right now. Hobby shops usually price close to market. Gas stations and vape shops usually sit a little lower, since their buyers are impulse shoppers. Every setting below is adjustable, and prices update as you type.</p>
+    <div class="calc-glob">
+      <label class="field">Hobby shop price, % of market <input id="rg-hobby" class="pct" type="number" min="1" max="300" step="1" value="100" inputmode="numeric"></label>
+      <label class="field">Counter price, % of market <input id="rg-counter" class="pct" type="number" min="1" max="300" step="1" value="90" inputmode="numeric"></label>
+      <label class="field"><input id="rg-floor" type="checkbox" checked> Never below MSRP</label>
+      <label class="field"><input id="rg-round" type="checkbox" checked> Round to .99</label>
+      <label class="field">Show <select id="rg-show" aria-label="Which products"><option value="all">All products</option><option value="dist">Distributor products only</option><option value="counter">Counter-friendly only</option></select></label>
+    </div>
+    <div class="scroll">
+      <table id="rg-table" data-source="buylist forecast">
+        <thead><tr>
+          <th>Product</th>
+          <th class="num hide-sm">MSRP</th>
+          <th class="num hide-sm">Market now</th>
+          <th class="num">Hobby shop price</th>
+          <th class="num">Counter price</th>
+          <th class="num hide-sm">Per pack</th>
+          <th class="num hide-sm">Sold as single packs</th>
+          <th class="hide-sm">Next 90 days</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="muted" style="margin-top:var(--cds-gap-sm)">"Per pack" is the hobby shop price divided by the packs inside. "Sold as single packs" is what a store could get by opening the product and selling each pack at that set's current single-pack market price, which many counter stores do. Counter prices are left blank for booster boxes and ETBs, which don't suit a gas station or vape shop counter. Use the Cost &amp; margin calculator above to check what the store keeps at these prices.</p>
   </section>
 
   <section class="card" id="buy-ranking">
@@ -880,6 +909,50 @@ document.getElementById('calc-copy').addEventListener('click', async () => {
   setTimeout(() => { msg.textContent = ''; }, 4000);
 });
 
+// ---------- Retail price guide ----------
+function retailPrice(market, msrp, pctv, floor, round) {
+  if (!(market > 0)) return null;
+  let v = market * pctv / 100;
+  if (floor && msrp > 0 && v < msrp) v = msrp;
+  if (round) v = v >= 1 ? Math.ceil(v) - 0.01 : Math.round(v * 100) / 100;
+  return Math.round(v * 100) / 100;
+}
+function renderRetail(list) {
+  const sd = dash.data('sealed'), fd = dash.data('forecast');
+  const tb = document.querySelector('#rg-table tbody');
+  if (sd.status !== 'ok' || !list.length) { if (tb) tb.replaceChildren(); return; }
+  const info = Object.fromEntries(sd.data.map(r => [r.id, r]));
+  const fc = fd.status === 'ok' ? Object.fromEntries(fd.data.map(r => [r.id, r])) : {};
+  const single = {};
+  for (const r of sd.data) if (r.channel === 'counter' && Number(r.packs) === 1 && Number(r.market) > 0) {
+    const v = Number(r.market); if (!(r.set in single) || v < single[r.set]) single[r.set] = v;
+  }
+  const hp = gval('rg-hobby') ?? 100, cp = gval('rg-counter') ?? 90;
+  const floor = document.getElementById('rg-floor').checked, round = document.getElementById('rg-round').checked;
+  const show = document.getElementById('rg-show').value;
+  const rowsR = list.filter(r => show === 'all' || (show === 'dist' ? (info[r.id] || {}).supply !== 'secondary' : r.fitCounter >= 5))
+    .map(r => {
+      const s = info[r.id] || {}, packs = Number(s.packs) || 0, msrp = r.msrp == null ? null : Number(r.msrp);
+      const hobby = retailPrice(r.market, msrp, hp, floor, round);
+      const counter = r.fitCounter >= 5 ? retailPrice(r.market, msrp, cp, floor, round) : null;
+      const sp = single[s.set];
+      return { r, s, packs, msrp, hobby, counter, perPack: packs && hobby ? hobby / packs : null,
+        singles: packs > 1 && sp ? packs * sp : null, sp, f: fc[r.id] || {} };
+    });
+  rows('#rg-table', rowsR, [
+    { draw: (td, x) => { td.append('span').text(x.r.item); td.append('span').attr('class', 'sub').text((TYPE_LABEL[x.s.channel] || '') + (x.s.supply === 'secondary' ? ' · resale market only' : '')); } },
+    { cls: 'num hide-sm', draw: (td, x) => td.text(x.msrp != null ? usd(x.msrp) : '—') },
+    { cls: 'num hide-sm', draw: (td, x) => td.text(usd(x.r.market)) },
+    { cls: 'num', draw: (td, x) => { td.append('b').text(x.hobby != null ? usd(x.hobby) : '—'); if (x.msrp && x.hobby) td.append('span').attr('class', 'sub').text(d3.format('.1f')(x.hobby / x.msrp) + '× MSRP'); } },
+    { cls: 'num', draw: (td, x) => { if (x.counter == null) { td.append('span').attr('class', 'muted').text('Not a counter item'); return; } td.append('b').text(usd(x.counter)); if (x.msrp) td.append('span').attr('class', 'sub').text(d3.format('.1f')(x.counter / x.msrp) + '× MSRP'); } },
+    { cls: 'num hide-sm', draw: (td, x) => td.text(x.perPack != null ? usd(x.perPack) : '—') },
+    { cls: 'num hide-sm', draw: (td, x) => { if (x.singles == null) { td.text('—'); return; } td.append('span').text(usd(x.singles)); td.append('span').attr('class', 'sub').text(x.packs + ' × ' + usd(x.sp)); } },
+    { cls: 'hide-sm', draw: (td, x) => { if (x.f.pred90 == null) { td.text('—'); return; } td.append('span').text(usd(x.f.pred90) + ' (' + pct(x.f.change90) + ')').classed('up', x.f.change90 > 0.005).classed('dn', x.f.change90 < -0.005); if (x.f.change90 <= -0.08) td.append('span').attr('class', 'sub').text('Shelf prices may need to drop'); } }
+  ], x => x.r.id);
+}
+['rg-hobby', 'rg-counter'].forEach(id => document.getElementById(id).addEventListener('input', () => render()));
+['rg-floor', 'rg-round', 'rg-show'].forEach(id => document.getElementById(id).addEventListener('change', () => render()));
+
 function render() {
   const M = MODES[mode];
   document.getElementById('score-th').setAttribute('data-field', M.score);
@@ -903,6 +976,7 @@ function render() {
   if (sd.status === 'ok') packsOf = Object.fromEntries(sd.data.map(r => [r.id, Number(r.packs) || 0]));
   renderPlan(list, M);
   calcData(list);
+  renderRetail(list);
   renderHistory();
   renderForecast();
   renderCalendar();
