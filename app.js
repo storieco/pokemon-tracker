@@ -109,6 +109,16 @@
       : 'Check your email for a sign-in link from Supabase. Open it on this device.';
   });
 
+  $('#google').addEventListener('click', async () => {
+    const msg = $('#login-msg');
+    msg.textContent = 'Opening Google...';
+    const { error } = await sb.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: location.origin + location.pathname, queryParams: { prompt: 'select_account' } },
+    });
+    if (error) msg.textContent = 'Google sign-in is not available yet: ' + error.message;
+  });
+
   $('#signout').addEventListener('click', async () => {
     await sb.auth.signOut();
     show('login');
