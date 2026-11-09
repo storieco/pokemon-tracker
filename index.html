@@ -79,22 +79,6 @@ body:has(#login:not([hidden])),body:has(#denied:not([hidden])){background:var(--
 .gate .back:hover{text-decoration:underline}
 .gate .remember{display:flex;align-items:center;gap:10px;font-size:14px;margin:0 0 14px;cursor:pointer;color:var(--ss-navy)}
 .gate .remember input{width:18px;height:18px;margin:0;flex:none;accent-color:var(--ss-teal)}
-#activity{margin:32px 0 16px;display:grid;gap:12px}
-#activity .act-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-#activity h2{font-family:var(--font-anthropic-serif);font-weight:400;font-size:22px;margin:0}
-#activity h3{font-size:15px;font-weight:600;margin:8px 0 0}
-#activity p{margin:0;color:var(--color-fg-muted);font-size:13px}
-.act-wrap{overflow-x:auto;border:1px solid var(--color-border-line);border-radius:var(--cds-radius);background:var(--color-panel)}
-.act-wrap table{border-collapse:collapse;width:100%;min-width:640px;font-size:13px}
-.act-wrap th,.act-wrap td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--color-border-line);white-space:nowrap}
-.act-wrap th{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--color-fg-muted)}
-.act-wrap tr:last-child td{border-bottom:0}
-.act-wrap .n{text-align:right;font-variant-numeric:tabular-nums}
-.act-empty{text-align:center;color:var(--color-fg-muted);padding:20px}
-.act-pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px}
-.act-pill.ok{background:color-mix(in srgb,var(--color-ok) 16%,transparent);color:var(--color-ok)}
-.act-pill.warn{background:color-mix(in srgb,var(--color-warn) 18%,transparent);color:var(--color-warn)}
-.act-pill.bad{background:color-mix(in srgb,var(--color-bad) 16%,transparent);color:var(--color-bad)}
 
 @media (prefers-color-scheme: dark){
   body:has(#login:not([hidden])),body:has(#denied:not([hidden])){background:#0B2230}
@@ -420,20 +404,6 @@ body:has(#login:not([hidden])),body:has(#denied:not([hidden])){background:var(--
       </div>
     </section>
   </div>
-<section id="activity" hidden aria-label="Sign-in activity">
-  <div class="act-head"><h2>Sign-in activity</h2><button class="btn" type="button" id="act-refresh">Refresh</button></div>
-  <p>Who has signed in, how often, and any failed attempts. Only admins see this. Times are your local time.</p>
-  <div class="act-wrap"><table>
-    <thead><tr><th>Person</th><th>Status</th><th>Last sign-in</th><th>Last active</th><th class="n">Sign-ins 7d</th><th class="n">Sign-ins 30d</th><th class="n">Opens 30d</th><th class="n">Days active 30d</th><th class="n">Failed 7d</th><th class="n">Remembered devices</th></tr></thead>
-    <tbody id="act-people-body"><tr><td colspan="10" class="act-empty">Loading…</td></tr></tbody>
-  </table></div>
-  <h3>Recent activity</h3>
-  <div class="act-wrap"><table>
-    <thead><tr><th>When</th><th>Who</th><th>What happened</th></tr></thead>
-    <tbody id="act-events-body"><tr><td colspan="3" class="act-empty">Loading…</td></tr></tbody>
-  </table></div>
-  <p>"Opens" counts sign-ins plus returning visits on a remembered device (counted at most once every 30 minutes).</p>
-</section>
 </div>
 <script src="photos.js"></script>
 <script>
