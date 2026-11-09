@@ -333,7 +333,7 @@ body:has(#login:not([hidden])),body:has(#denied:not([hidden])){background:var(--
     <div class="ctl"><label class="field">Product <select id="hist-pick" aria-label="Product"></select></label><span class="muted" id="hist-count"></span></div>
     <div class="chartbox" id="hist-chart" data-source="history"></div>
     <h2 style="margin-top:var(--cds-gap-lg)">Biggest price moves</h2>
-    <p class="note">Change from the earliest saved price to the latest. Once a week of daily prices builds up, this shows the real weekly movers.</p>
+    <p class="note">Change from the earliest saved price to the latest. Prices are saved once a week, every Monday.</p>
     <div class="scroll" style="max-height:20rem">
       <table id="movers-table" data-source="movers" data-row-key="id">
         <thead><tr><th data-field="item">Product</th><th data-field="fromDate" class="hide-sm">Since</th><th data-field="fromPrice" class="num hide-sm">Then</th><th data-field="toPrice" class="num">Now</th><th data-field="change" class="num">Change</th></tr></thead>
@@ -344,7 +344,7 @@ body:has(#login:not([hidden])),body:has(#denied:not([hidden])){background:var(--
 
   <section class="card" id="price-forecast">
     <h2>Price forecast</h2>
-    <p class="note">Where each product's market price is likely headed in 30 and 90 days. It follows the usual Pokémon pattern: new products start high, slide for a few months, level off, then slowly climb once out of print. Buyer opinion and overprint risk tilt it, and each product's own price history counts more as daily prices build up. Treat it as a guide, not a guarantee.</p>
+    <p class="note">Where each product's market price is likely headed in 30 and 90 days. It follows the usual Pokémon pattern: new products start high, slide for a few months, level off, then slowly climb once out of print. Buyer opinion and overprint risk tilt it, and each product's own price history counts more as weekly prices build up. Treat it as a guide, not a guarantee.</p>
     <div class="scroll">
       <table id="fc-table" data-source="forecast" data-row-key="id">
         <thead><tr><th data-field="item">Product</th><th data-field="now" class="num hide-sm">Now</th><th data-field="pred30" class="num">30 days</th><th data-field="pred90" class="num">90 days</th><th data-field="call">What to do</th></tr></thead>
@@ -480,7 +480,7 @@ dash.calc('movers', {
 
 dash.calc('forecast', {
   title: 'Price forecast',
-  description: 'Predicts each product 30 and 90 days out: new sets decay toward a floor (1.15x MSRP for booster boxes, 1.45x for ETBs, 1.4x otherwise, and 2.4x for special sets that have no booster box) over about 2.5 months, then rise about 1.5% a month after 8 months; buyer opinion and overprint risk tilt it; once 5+ daily prices exist, the product\'s own trend line is blended in. 90-day drop capped at 30%.',
+  description: 'Predicts each product 30 and 90 days out: new sets decay toward a floor (1.15x MSRP for booster boxes, 1.45x for ETBs, 1.4x otherwise, and 2.4x for special sets that have no booster box) over about 2.5 months, then rise about 1.5% a month after 8 months; buyer opinion and overprint risk tilt it; once 5+ saved prices exist, the product\'s own trend line is blended in. 90-day drop capped at 30%.',
   inputs: ['sealed', 'history'],
   fn: (sealed, history) => {
   const DAY = 864e5, MO = 30.44;
