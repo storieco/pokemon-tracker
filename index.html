@@ -482,11 +482,11 @@ dash.calc('movers', {
 
 dash.calc('forecast', {
   title: 'Price forecast',
-  description: 'Predicts each product 30 and 90 days out: new sets decay toward a floor (1.15x MSRP for booster boxes, 1.45x for ETBs, 1.4x otherwise, and 2.4x for special sets that have no booster box) over about 2.5 months, then rise about 1.5% a month after 8 months; buyer opinion and overprint risk tilt it; once 5+ saved prices exist, the product\'s own trend line is blended in. 90-day drop capped at 30%.',
+  description: 'Predicts each product 30 and 90 days out: new sets decay toward a floor (1.15x MSRP for booster boxes, 1.45x for ETBs, 1.4x otherwise, and 2.4x for special sets that have no booster box) over about 2.5 months, then rise about 1.5% a month after 8 months; buyer opinion and overprint risk tilt it; once 5+ saved prices exist, the product\'s own trend line is blended in. 90-day drop capped at 30%. Unreleased products keep their preorder price until launch, then lose about two thirds of their premium over the floor, the usual launch-day drop.',
   inputs: ['sealed', 'history'],
   fn: (sealed, history) => {
   const DAY = 864e5, MO = 30.44;
-  const FLOORS = { box: 1.15, etb: 1.45 }, FLOOR_OTHER = 1.4, FLOOR_SPECIAL = 2.4, MAX_DROP_90 = 0.3, TAU = 2.5, GROWTH = 0.015, OUT_OF_PRINT_MO = 8;
+  const FLOORS = { box: 1.15, etb: 1.45 }, FLOOR_OTHER = 1.4, FLOOR_SPECIAL = 2.4, MAX_DROP_90 = 0.3, TAU = 2.5, GROWTH = 0.015, OUT_OF_PRINT_MO = 8, LAUNCH_KEEP = 0.35;
   const parse = d => new Date(d + 'T00:00:00Z');
   const boxSets = new Set(sealed.filter(r => r.channel === 'box').map(r => r.set));
   const floorFor = r => !boxSets.has(r.set) ? FLOOR_SPECIAL : (FLOORS[r.channel] || FLOOR_OTHER);
@@ -495,6 +495,12 @@ dash.calc('forecast', {
   const model = (p, msrp, ageMo, hMo, sentiment, printRisk, FLOOR) => {
     const a = Math.max(0, ageMo);
     let base;
+    if (ageMo < 0) {
+      // not released yet: preorder price holds until launch, then most of the premium over the floor is gone
+      const floor = msrp ? msrp * FLOOR : p * 0.6, relIn = -ageMo;
+      if (hMo <= relIn || p <= floor) return p;
+      return floor + (p - floor) * LAUNCH_KEEP * Math.exp(-(hMo - relIn) / TAU);
+    }
     if (a >= OUT_OF_PRINT_MO) base = p * Math.pow(1 + GROWTH, hMo);
     else {
       const floor = msrp ? msrp * FLOOR : p * 0.85;
@@ -545,7 +551,7 @@ dash.calc('backtest', {
   description: 'Runs the same model from each product\'s earliest saved price (at least a month back) and compares the prediction to the latest actual price.',
   inputs: ['sealed', 'history'],
   fn: (sealed, history) => {
-  const DAY = 864e5, MO = 30.44, FLOORS = { box: 1.15, etb: 1.45 }, FLOOR_OTHER = 1.4, FLOOR_SPECIAL = 2.4, TAU = 2.5, GROWTH = 0.015, OUT_OF_PRINT_MO = 8;
+  const DAY = 864e5, MO = 30.44, FLOORS = { box: 1.15, etb: 1.45 }, FLOOR_OTHER = 1.4, FLOOR_SPECIAL = 2.4, TAU = 2.5, GROWTH = 0.015, OUT_OF_PRINT_MO = 8, LAUNCH_KEEP = 0.35;
   const parse = d => new Date(d + 'T00:00:00Z');
   const boxSets = new Set(sealed.filter(r => r.channel === 'box').map(r => r.set));
   const floorFor = r => !boxSets.has(r.set) ? FLOOR_SPECIAL : (FLOORS[r.channel] || FLOOR_OTHER);
@@ -561,9 +567,15 @@ dash.calc('backtest', {
     const hMo = (b.t - a.t) / DAY / MO;
     if (hMo < 1) continue;
     const msrp = r.msrp == null ? null : Number(r.msrp);
-    const ageMo = r.releaseDate ? Math.max(0, (a.t - parse(r.releaseDate)) / DAY / MO) : 6;
+    const rel = r.releaseDate ? parse(r.releaseDate) : null;
+    const ageMo = rel ? Math.max(0, (a.t - rel) / DAY / MO) : 6;
     let pred;
-    if (ageMo >= OUT_OF_PRINT_MO) pred = a.v * Math.pow(1 + GROWTH, hMo);
+    if (rel && a.t < rel) {
+      // preorder price: holds until launch, then most of the premium over the floor is gone
+      const floor = msrp ? msrp * floorFor(r) : a.v * 0.6;
+      const postMo = (b.t - rel) / DAY / MO;
+      pred = b.t < rel || a.v <= floor ? a.v : floor + (a.v - floor) * LAUNCH_KEEP * Math.exp(-postMo / TAU);
+    } else if (ageMo >= OUT_OF_PRINT_MO) pred = a.v * Math.pow(1 + GROWTH, hMo);
     else {
       const floor = msrp ? msrp * floorFor(r) : a.v * 0.85;
       pred = (a.v > floor ? floor + (a.v - floor) * Math.exp(-hMo / TAU) : a.v) * Math.pow(1 + GROWTH, Math.max(0, ageMo + hMo - OUT_OF_PRINT_MO));
@@ -752,7 +764,7 @@ function renderCalendar() {
         td.append('span').text(d3.utcFormat('%b %-d')(d));
         td.append('span').attr('class', 'sub' + (days >= 0 && days <= 14 ? ' soon' : '')).text(days < 0 ? 'Out now' : days === 0 ? 'Today' : 'In ' + days + ' days'); } },
     { draw: (td, r) => { td.append('span').text(r.product + (r.lang === 'JP' ? ' (Japan)' : '')); td.append('span').attr('class', 'sub').text(r.type + ' · ' + r.note); } },
-    { cls: 'num hide-sm', draw: (td, r) => td.text(r.msrp == null ? '—' : usd(Number(r.msrp))) },
+    { cls: 'num hide-sm', draw: (td, r) => td.text(r.msrp != null ? usd(Number(r.msrp)) : r.lang === 'JP' ? 'Import' : '—') },
     { draw: (td, r) => td.append('span').attr('class', 'badge').text(FIT_LABEL[r.storeFit] || r.storeFit) }
   ], r => r.id);
 }
@@ -840,7 +852,7 @@ function productDetails(id) {
   fact('Where to buy', p.supply === 'secondary' ? 'Resale market only' : 'Distributor');
   fact('Set kind', f.special ? 'Special (no booster box)' : 'Main set');
   fact('Packs', p.packs ? String(p.packs) : null);
-  fact('MSRP', p.msrp != null ? usd(p.msrp) : null);
+  fact('MSRP', p.msrp != null ? usd(p.msrp) : (p.s && p.s.lang === 'JP') || (p.b && p.b.lang === 'JP') ? 'None in the US (Japanese import)' : null);
   fact('Market price', usd(p.market));
   fact('Price date', s.asOf ? fmtDate(parseDay(s.asOf)) : null);
   fact('Market vs MSRP', b.premium != null ? d3.format('.1f')(b.premium) + '×' : null);
@@ -979,7 +991,7 @@ function renderRetail(list) {
     });
   rows('#rg-table', rowsR, [
     { draw: (td, x) => { td.append('span').text(x.r.item); td.append('span').attr('class', 'sub').text((TYPE_LABEL[x.s.channel] || '') + (x.s.supply === 'secondary' ? ' · resale market only' : '')); } },
-    { cls: 'num hide-sm', draw: (td, x) => td.text(x.msrp != null ? usd(x.msrp) : '—') },
+    { cls: 'num hide-sm', draw: (td, x) => td.text(x.msrp != null ? usd(x.msrp) : x.s.lang === 'JP' ? 'Import' : '—') },
     { cls: 'num hide-sm', draw: (td, x) => td.text(usd(x.r.market)) },
     { cls: 'num', draw: (td, x) => { td.append('b').text(x.hobby != null ? usd(x.hobby) : '—'); if (x.msrp && x.hobby) td.append('span').attr('class', 'sub').text(d3.format('.1f')(x.hobby / x.msrp) + '× MSRP'); } },
     { cls: 'num', draw: (td, x) => { if (x.counter == null) { td.append('span').attr('class', 'muted').text('Not a counter item'); return; } td.append('b').text(usd(x.counter)); if (x.msrp) td.append('span').attr('class', 'sub').text(d3.format('.1f')(x.counter / x.msrp) + '× MSRP'); } },
