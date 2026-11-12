@@ -75,6 +75,7 @@
       }
     });
     show('board');
+    loadPricing();
     if (products) {
       const latest = products.map((p) => p.asOf).filter(Boolean).sort().pop();
       $('#updated').textContent = latest ? 'Prices as of ' + latest : '';
@@ -86,8 +87,14 @@
     }
   }
   window.__reloadData = loadData;
+  window.__distroRpc = (fn, args) => rpc(fn, Object.assign({ p_token: token }, args));
+  async function loadPricing() {
+    try { window.setDistroPricing && window.setDistroPricing(await rpc('pokemon_data', { p_token: token, p_dataset: 'pricing' })); }
+    catch (e) { console.error(e); }
+  }
 
   function openBoard(me) {
+    if (me && me.role === 'store') { location.replace(/storiesaxe\.com$/.test(location.hostname) ? '/trackers/pokemon-stores' : 'store.html'); return; }
     $('#who').textContent = me.email || '';
     loadData();
   }
