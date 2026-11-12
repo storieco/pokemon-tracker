@@ -267,7 +267,7 @@ body:has(#login:not([hidden])),body:has(#denied:not([hidden])){background:var(--
 
   <section class="card" id="buy-plan">
     <h2>Buy plan</h2>
-    <p class="note">Enter a budget and the plan splits it across the top-scoring products for the store type picked below (scores of 60 and up). Products that don't suit those stores are left out (no booster boxes or ETBs for counters). Better scores get a bigger share, and no single product gets more than 30%. Unit cost starts at the distro cost percent from Distro pricing; change it here to test a different cost.</p>
+    <p class="note">Enter a budget and the plan splits it across the top-scoring products for the store type picked below (scores of 60 and up). Every product is open to every store; the store type only changes how products are scored. Better scores get a bigger share, and no single product gets more than 30%. Unit cost starts at the distro cost percent from Distro pricing; change it here to test a different cost.</p>
     <div class="ctl">
       <label class="field">Budget $<input id="budget" type="number" min="100" step="100" value="10000" inputmode="numeric"></label>
       <label class="field">Cost as % of market <input id="costpct" class="pct" type="number" min="10" max="150" step="1" value="90" inputmode="numeric"></label>
@@ -340,7 +340,7 @@ body:has(#login:not([hidden])),body:has(#denied:not([hidden])){background:var(--
         <tbody></tbody>
       </table>
     </div>
-    <p class="muted" style="margin-top:var(--cds-gap-sm)">"Per pack" is the specialty store price divided by the packs inside. "Sold as single packs" is what a store could get by opening the product and selling each pack at that set's current single-pack market price, which many counter stores do. Counter prices are left blank for booster boxes and ETBs, which don't suit a convenience store counter. Use the Cost &amp; margin calculator above to check what the store keeps at these prices.</p>
+    <p class="muted" style="margin-top:var(--cds-gap-sm)">"Per pack" is the specialty store price divided by the packs inside. "Sold as single packs" is what a store could get by opening the product and selling each pack at that set's current single-pack market price, which many counter stores do. Every product shows both prices, since every store can carry every product. Use the Cost &amp; margin calculator above to check what the store keeps at these prices.</p>
   </section>
 
   <section class="card" id="buy-ranking">
@@ -660,7 +660,7 @@ const parseDay = d => new Date(d + 'T00:00:00Z');
 const pct = d3.format('+.1%');
 
 function planFor(list, scoreKey, fitKey, budget, costPct) {
-  const cands = list.filter(r => r[scoreKey] >= 60 && r[fitKey] >= 5 && r.market > 0).map(r => ({ r, s: r[scoreKey], cost: r.market * costPct / 100 }))
+  const cands = list.filter(r => r[scoreKey] >= 60 && r.market > 0).map(r => ({ r, s: r[scoreKey], cost: r.market * costPct / 100 }))
     .sort((a, b) => b.s - a.s);
   if (!cands.length || !(budget > 0)) return { lines: [], spent: 0 };
   const cap = budget * 0.3;
@@ -1023,7 +1023,7 @@ function renderRetail(list) {
     .map(r => {
       const s = info[r.id] || {}, packs = Number(s.packs) || 0, msrp = r.msrp == null ? null : Number(r.msrp);
       const hobby = retailPrice(r.market, msrp, hp, floor, round);
-      const counter = r.fitCounter >= 5 ? retailPrice(r.market, msrp, cp, floor, round) : null;
+      const counter = retailPrice(r.market, msrp, cp, floor, round);
       const sp = single[s.set];
       return { r, s, packs, msrp, hobby, counter, perPack: packs && hobby ? hobby / packs : null,
         singles: packs > 1 && sp ? packs * sp : null, sp, f: fc[r.id] || {} };
@@ -1211,6 +1211,6 @@ document.querySelectorAll('.pw .nav a').forEach(a => a.addEventListener('click',
 </div>
 </div>
 
-<script src="app.js?v=20261112c"></script>
+<script src="app.js?v=20261112d"></script>
 </body>
 </html>

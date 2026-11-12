@@ -108,15 +108,11 @@ th{font-size:12.5px;color:var(--muted);font-weight:600}
 <main id="board" hidden>
   <div class="head">
     <h1 id="title">Pokémon store guide</h1>
-    <p>A suggested sale price for every product, set above what collectors pay online so the product earns its spot on your shelf. Pick your kind of store to see the products that sell best there.</p>
+    <p>A suggested sale price for every product, set above what collectors pay online so the product earns its spot on your shelf. Every product is available to every store.</p>
     <p class="small" id="updated"></p>
   </div>
   <div class="controls">
-    <div class="seg" id="type-seg" role="group" aria-label="Store type">
-      <button type="button" data-type="hobby" aria-pressed="true">Specialty store</button>
-      <button type="button" data-type="counter" aria-pressed="false">Convenience store</button>
-    </div>
-    <label class="ctl">Show <select id="show"><option value="fit">Best for my store</option><option value="all">All products</option><option value="counter">Packs, blisters, tins and bundles</option><option value="hobby">Booster boxes and ETBs</option></select></label>
+    <label class="ctl">Show <select id="show"><option value="all">All products</option><option value="counter">Packs, blisters, tins and bundles</option><option value="hobby">Booster boxes and ETBs</option></select></label>
     <label class="ctl">Sort <select id="sort"><option value="hot">Hottest</option><option value="premium">Highest price over market</option><option value="newest">Newest</option><option value="low">Lowest price</option></select></label>
   </div>
   <div class="tiles">
@@ -127,11 +123,11 @@ th{font-size:12.5px;color:var(--muted);font-weight:600}
   </div>
   <div class="grid" id="grid"></div>
   <h2>Coming soon</h2>
-  <table><thead><tr><th>Date</th><th>Product</th><th>Good for</th></tr></thead><tbody id="rel"></tbody></table>
+  <table><thead><tr><th>Date</th><th>Product</th></tr></thead><tbody id="rel"></tbody></table>
   <p class="small" style="margin-top:18px">Suggested sale prices are set above the online market price (more for packs, blisters, tins and bundles sold at the counter), never below MSRP, and rounded to .99. Online market prices come from TCGplayer and update weekly. Not affiliated with or endorsed by The Pokémon Company.</p>
 </main>
 
 <script src="photos.js?v=20261112"></script>
-<script src="store.js?v=20261112c"></script>
+<script src="store.js?v=20261112d"></script>
 </body>
 </html>

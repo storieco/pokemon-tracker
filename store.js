@@ -29,11 +29,10 @@
   const savePrefs = () => { try { localStorage.setItem(PREF, JSON.stringify(prefs)); } catch (e) {} };
 
   const show = (name) => { $('#login').hidden = name !== 'login'; $('#board').hidden = name !== 'board'; $('#account').hidden = name !== 'board'; };
-  let data = null, type = 'hobby';
+  let data = null;
 
   function render() {
     if (!data) return;
-    document.querySelectorAll('#type-seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.type === type)));
     const showV = $('#show').value, sortV = $('#sort').value;
     const today = new Date(); today.setHours(0, 0, 0, 0);
     let list = data.products.map((r) => {
@@ -46,8 +45,7 @@
       p.name = p.set + ' ' + p.product;
       return p;
     });
-    if (showV === 'fit') list = list.filter((p) => (type === 'counter' ? p.counter : true));
-    else if (showV === 'counter') list = list.filter((p) => p.counter);
+    if (showV === 'counter') list = list.filter((p) => p.counter);
     else if (showV === 'hobby') list = list.filter((p) => !p.counter);
     const hotScore = (p) => (Number(p.sentiment) || 0) * 2 + (Number(p.trend) || 0) + (p.isNew ? 1 : 0);
     list.sort(sortV === 'premium' ? (a, b) => b.over - a.over
@@ -97,14 +95,13 @@
     }
 
     const tb = $('#rel'); tb.replaceChildren();
-    const rel = (data.releases || []).filter((r) => type === 'counter' ? r.storeFit !== 'hobby' : true);
-    if (!rel.length) { const tr = el('tr'); const td = el('td', 'empty', 'Nothing announced right now.'); td.colSpan = 3; tr.append(td); tb.append(tr); }
+    const rel = data.releases || [];
+    if (!rel.length) { const tr = el('tr'); const td = el('td', 'empty', 'Nothing announced right now.'); td.colSpan = 2; tr.append(td); tb.append(tr); }
     for (const r of rel) {
       const tr = el('tr');
       const d = new Date(r.date + 'T00:00:00');
       tr.append(el('td', null, d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })));
       const td = el('td'); td.append(el('div', null, r.product + (r.lang === 'JP' ? ' (Japan)' : ''))); if (r.note) td.append(el('div', 'small', r.note)); tr.append(td);
-      tr.append(el('td', null, r.storeFit === 'counter' ? 'Convenience stores' : r.storeFit === 'hobby' ? 'Specialty stores' : 'All stores'));
       tb.append(tr);
     }
   }
@@ -117,7 +114,6 @@
       $('#login-msg').textContent = "Couldn't load prices. Try again in a minute."; show('login'); return;
     }
     const me = data.me || {};
-    type = prefs.type || me.storeType || 'hobby';
     $('#who').textContent = me.email || '';
     $('#title').textContent = me.storeName ? 'Pokémon guide for ' + me.storeName : 'Pokémon store guide';
     const latest = (data.products || []).map((p) => p.asOf).filter(Boolean).sort().pop();
@@ -128,10 +124,6 @@
 
   function signedOut(msg) { store.del(TOK); token = null; $('#login-msg').textContent = msg || ''; show('login'); }
 
-  document.querySelectorAll('#type-seg button').forEach((b) => b.addEventListener('click', () => {
-    type = b.dataset.type; prefs.type = type; savePrefs();
-    render();
-  }));
   $('#show').addEventListener('change', render);
   $('#sort').addEventListener('change', render);
 
