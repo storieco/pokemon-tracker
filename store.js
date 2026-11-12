@@ -104,7 +104,7 @@
       const d = new Date(r.date + 'T00:00:00');
       tr.append(el('td', null, d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })));
       const td = el('td'); td.append(el('div', null, r.product + (r.lang === 'JP' ? ' (Japan)' : ''))); if (r.note) td.append(el('div', 'small', r.note)); tr.append(td);
-      tr.append(el('td', null, r.storeFit === 'counter' ? 'Gas and vape shops' : r.storeFit === 'hobby' ? 'Hobby shops' : 'All stores'));
+      tr.append(el('td', null, r.storeFit === 'counter' ? 'Convenience stores' : r.storeFit === 'hobby' ? 'Specialty stores' : 'All stores'));
       tb.append(tr);
     }
   }
