@@ -1,5 +1,5 @@
-// Store price list: sign-in (email + access code) and the store's own prices.
-// The database only sends each product's wholesale price to this page, never the distributor's cost or markup.
+// Store guide: sign-in (email + access code) and suggested sale prices.
+// The database only sends each product's suggested sale price, never the distributor's cost, markup or the store's own price.
 (() => {
   const API = 'https://gnsrcsuyljrirwmvvcmh.supabase.co/rest/v1/rpc/';
   const KEY = 'sb_publishable_vzx44rpaqGYbQYxBhhMJdA_kT5LzPA7';
@@ -31,26 +31,16 @@
   const show = (name) => { $('#login').hidden = name !== 'login'; $('#board').hidden = name !== 'board'; $('#account').hidden = name !== 'board'; };
   let data = null, type = 'hobby';
 
-  function shelfFor(p, mk) {
-    let v = Math.max(p.market, p.wholesale) * (1 + mk);
-    if (p.msrp > 0 && v < p.msrp) v = p.msrp;
-    return v >= 1 ? Math.ceil(v) - 0.01 : Math.round(v * 100) / 100;
-  }
-  const defaultMarkup = () => Math.round(((data && data.shelfMarkup && data.shelfMarkup[type]) ?? (type === 'counter' ? 0.3 : 0.1)) * 100);
-  const markupNow = () => { const v = Number($('#markup').value); return isFinite(v) && $('#markup').value !== '' ? v / 100 : defaultMarkup() / 100; };
-
   function render() {
     if (!data) return;
     document.querySelectorAll('#type-seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.type === type)));
-    const mk = markupNow();
     const showV = $('#show').value, sortV = $('#sort').value;
     const today = new Date(); today.setHours(0, 0, 0, 0);
     let list = data.products.map((r) => {
-      const p = { ...r, market: Number(r.market), wholesale: Number(r.wholesale), msrp: r.msrp == null ? null : Number(r.msrp), packs: Number(r.packs) || 0 };
+      const p = { ...r, market: Number(r.market), msrp: r.msrp == null ? null : Number(r.msrp), packs: Number(r.packs) || 0 };
       p.counter = COUNTER_CH.has(p.channel);
-      p.shelf = shelfFor(p, mk);
-      p.profit = p.shelf - p.wholesale;
-      p.margin = p.shelf > 0 ? p.profit / p.shelf : 0;
+      p.sale = Number(r.salePrice);
+      p.over = p.market > 0 ? p.sale / p.market - 1 : 0;
       p.rel = p.releaseDate ? new Date(p.releaseDate + 'T00:00:00') : null;
       p.isNew = p.rel && (today - p.rel) / 864e5 <= 30 && (today - p.rel) >= 0;
       p.name = p.set + ' ' + p.product;
@@ -60,16 +50,16 @@
     else if (showV === 'counter') list = list.filter((p) => p.counter);
     else if (showV === 'hobby') list = list.filter((p) => !p.counter);
     const hotScore = (p) => (Number(p.sentiment) || 0) * 2 + (Number(p.trend) || 0) + (p.isNew ? 1 : 0);
-    list.sort(sortV === 'hot' ? (a, b) => hotScore(b) - hotScore(a) || b.margin - a.margin
+    list.sort(sortV === 'premium' ? (a, b) => b.over - a.over
       : sortV === 'newest' ? (a, b) => (b.rel || 0) - (a.rel || 0)
-      : sortV === 'low' ? (a, b) => a.wholesale - b.wholesale
-      : (a, b) => b.margin - a.margin);
+      : sortV === 'low' ? (a, b) => a.sale - b.sale
+      : (a, b) => hotScore(b) - hotScore(a) || b.over - a.over);
 
     $('#t-count').textContent = String(list.length);
-    $('#t-margin').textContent = list.length ? pctf(list.reduce((t, p) => t + p.margin, 0) / list.length) : '—';
-    const best = list.slice().sort((a, b) => b.margin - a.margin)[0];
+    $('#t-margin').textContent = list.length ? '+' + pctf(list.reduce((t, p) => t + p.over, 0) / list.length) : '—';
+    const best = list.filter((p) => p.rel && p.rel <= today).sort((a, b) => b.rel - a.rel)[0];
     $('#t-best').textContent = best ? best.name : '—';
-    $('#t-best-sub').textContent = best ? usd(best.profit) + ' profit (' + pctf(best.margin) + ')' : '';
+    $('#t-best-sub').textContent = best ? 'Out ' + best.rel.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
     const hot = list.slice().sort((a, b) => hotScore(b) - hotScore(a))[0];
     $('#t-hot').textContent = hot ? hot.name : '—';
     $('#t-hot-sub').textContent = hot && hot.opinion ? hot.opinion : '';
@@ -94,15 +84,13 @@
       row.append(ph, info); c.append(row);
       const nums = el('div', 'nums');
       const n = (lab, val, cls) => { const d = el('div', null, lab); const b = el('b', cls, val); d.append(b); nums.append(d); };
-      n('Your price', usd(p.wholesale));
-      n('Shelf price', usd(p.shelf));
-      n('You keep', usd(p.profit), p.margin >= 0.2 ? 'up' : p.margin < 0.1 ? 'dn' : '');
-      nums.lastChild.querySelector('b').append(el('small', null, pctf(p.margin) + ' of shelf price'));
+      n('Online market', usd(p.market));
+      n('Suggested sale price', usd(p.sale), 'up');
+      nums.lastChild.querySelector('b').append(el('small', null, '+' + pctf(p.over) + ' over market'));
       c.append(nums);
       const extra = [];
-      extra.push('Online market ' + usd(p.market));
       if (p.msrp) extra.push('MSRP ' + usd(p.msrp));
-      if (p.packs > 1) extra.push(usd(p.shelf / p.packs) + ' per pack on the shelf');
+      if (p.packs > 1) extra.push(usd(p.sale / p.packs) + ' per pack at the sale price');
       c.append(el('div', 'small', extra.join(' · ')));
       if (p.opinion) c.append(el('div', 'opinion', p.opinion));
       grid.append(c);
@@ -131,8 +119,7 @@
     const me = data.me || {};
     type = prefs.type || me.storeType || 'hobby';
     $('#who').textContent = me.email || '';
-    $('#title').textContent = me.storeName ? 'Prices for ' + me.storeName : 'Pokémon price list';
-    $('#markup').value = prefs['mk_' + type] ?? defaultMarkup();
+    $('#title').textContent = me.storeName ? 'Pokémon guide for ' + me.storeName : 'Pokémon store guide';
     const latest = (data.products || []).map((p) => p.asOf).filter(Boolean).sort().pop();
     $('#updated').textContent = latest ? 'Prices updated ' + new Date(latest + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
     show('board');
@@ -143,10 +130,8 @@
 
   document.querySelectorAll('#type-seg button').forEach((b) => b.addEventListener('click', () => {
     type = b.dataset.type; prefs.type = type; savePrefs();
-    $('#markup').value = prefs['mk_' + type] ?? defaultMarkup();
     render();
   }));
-  $('#markup').addEventListener('input', () => { prefs['mk_' + type] = $('#markup').value; savePrefs(); render(); });
   $('#show').addEventListener('change', render);
   $('#sort').addEventListener('change', render);
 

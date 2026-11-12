@@ -232,7 +232,7 @@ body:has(#login:not([hidden])),body:has(#denied:not([hidden])){background:var(--
 
   <section class="card" id="distro-pricing">
     <h2>Distro pricing</h2>
-    <p class="note">What the distro pays for each product, what it charges stores, and how much room that leaves the store. Costs start at a percent of the TCGplayer market price. Type the real invoice cost for any product and it saves for everyone on the distro side. Stores never see this section. On the store tracker they only see their price, a suggested shelf price and their profit.</p>
+    <p class="note">What the distro pays for each product, what it charges stores, and how much room that leaves the store. Costs start at a percent of the TCGplayer market price. Type the real invoice cost for any product and it saves for everyone on the distro side. Stores never see this section. On the store guide they only see the online market price and a suggested sale price, never their own price or yours.</p>
     <div class="calc-glob">
       <label class="field">Distro cost, % of market <input id="dp-cost" class="pct" type="number" min="10" max="200" step="1" value="90" inputmode="numeric"></label>
       <label class="field">Markup to stores % <input id="dp-markup" class="pct" type="number" min="0" max="200" step="1" value="10" inputmode="numeric"></label>
@@ -244,7 +244,7 @@ body:has(#login:not([hidden])),body:has(#denied:not([hidden])){background:var(--
     <div class="totals">
       <div>Avg distro profit per unit<b id="dp-avgprofit">—</b></div>
       <div>Avg distro margin<b id="dp-avgmargin">—</b></div>
-      <div>Avg store margin at shelf price<b id="dp-storemargin">—</b></div>
+      <div>Avg store margin at sale price<b id="dp-storemargin">—</b></div>
       <div>Thin for stores (under 10%)<b id="dp-thin">—</b></div>
     </div>
     <label class="field" style="font-size:var(--cds-font-size-caption)">Show <select id="dp-show" aria-label="Which products"><option value="all">All products</option><option value="thin">Thin for stores only</option><option value="custom">Products with a real cost entered</option></select></label>
@@ -256,13 +256,13 @@ body:has(#login:not([hidden])),body:has(#denied:not([hidden])){background:var(--
           <th class="num">Distro cost</th>
           <th class="num">Price to stores</th>
           <th class="num hide-sm">Distro profit</th>
-          <th class="num">Shelf price</th>
+          <th class="num">Store sale price</th>
           <th class="num">Store profit</th>
         </tr></thead>
         <tbody></tbody>
       </table>
     </div>
-    <p class="muted">Price to stores = distro cost plus the markup. Shelf price = the higher of market price or the store's price, plus the shelf markup for that kind of store, never below MSRP, rounded to .99. Booster boxes and ETBs use the hobby shop markup. Packs, blisters, tins and bundles use the gas and vape markup. Settings and costs here also set what stores see on their tracker.</p>
+    <p class="muted">Price to stores = distro cost plus the markup. Store sale price = the higher of market price or the store's price, plus the shelf markup for that kind of store, never below MSRP, rounded to .99. This is the suggested sale price stores see. Booster boxes and ETBs use the hobby shop markup. Packs, blisters, tins and bundles use the gas and vape markup. Settings and costs here also set the sale prices stores see on their guide.</p>
   </section>
 
   <section class="card" id="buy-plan">
