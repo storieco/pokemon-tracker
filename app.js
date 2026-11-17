@@ -1,8 +1,8 @@
-// Sign-in (email + personal access code) and data loading for the shared Pokémon buy board.
+// Sign-in (email + password) and data loading for the shared Pokémon buy board.
 // No sign-in emails are sent. Only people on the approved list with a valid code can read data.
 (() => {
-  const API = 'https://gnsrcsuyljrirwmvvcmh.supabase.co/rest/v1/rpc/';
-  const KEY = 'sb_publishable_vzx44rpaqGYbQYxBhhMJdA_kT5LzPA7';
+  const API = 'https://ruvwycqjqcsyvjjaghyc.supabase.co/rest/v1/rpc/';
+  const KEY = 'sb_publishable_HnSKPb79VmA3gTd4iI6Pcg_zSXzU078';
   const TOK = 'pokemon-session';
 
   const $ = (s) => document.querySelector(s);
@@ -111,7 +111,7 @@
     $('#send').disabled = true;
     msg.textContent = 'Signing in...';
     try {
-      const r = await rpc('pokemon_login', { p_email: email, p_code: code, p_remember: remember });
+      const r = await rpc('pokemon_login', { p_email: email, p_password: code, p_remember: remember });
       if (r && r.ok) {
         token = r.token;
         saveToken(r.token, remember);
@@ -123,7 +123,7 @@
       } else {
         msg.textContent = (r && r.reason) === 'locked'
           ? 'Too many wrong tries for this email. Wait 15 minutes, then try again.'
-          : "That email and code don't match. Check both and try again.";
+          : "That email and password don't match. Check both and try again.";
       }
     } catch (err) {
       msg.textContent = "Couldn't reach the sign-in service. Check your connection and try again.";

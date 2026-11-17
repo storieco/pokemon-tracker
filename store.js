@@ -1,8 +1,8 @@
-// Store guide: sign-in (email + access code) and suggested sale prices.
+// Store guide: sign-in (email + password) and suggested sale prices.
 // The database only sends each product's suggested sale price, never the distributor's cost, markup or the store's own price.
 (() => {
-  const API = 'https://gnsrcsuyljrirwmvvcmh.supabase.co/rest/v1/rpc/';
-  const KEY = 'sb_publishable_vzx44rpaqGYbQYxBhhMJdA_kT5LzPA7';
+  const API = 'https://ruvwycqjqcsyvjjaghyc.supabase.co/rest/v1/rpc/';
+  const KEY = 'sb_publishable_HnSKPb79VmA3gTd4iI6Pcg_zSXzU078';
   const TOK = 'pokemon-session';
   const PREF = 'pokemon-store-prefs';
   const COUNTER_CH = new Set(['counter', 'bundle', 'kit']);
@@ -134,9 +134,9 @@
     if (!email || !code) return;
     $('#send').disabled = true; msg.textContent = 'Signing in...';
     try {
-      const r = await rpc('pokemon_login', { p_email: email, p_code: code, p_remember: remember });
+      const r = await rpc('pokemon_login', { p_email: email, p_password: code, p_remember: remember });
       if (r && r.ok) { token = r.token; store.set(TOK, r.token, remember); $('#code').value = ''; msg.textContent = ''; await load(); }
-      else msg.textContent = (r && r.reason) === 'locked' ? 'Too many wrong tries for this email. Wait 15 minutes, then try again.' : "That email and code don't match. Check both and try again.";
+      else msg.textContent = (r && r.reason) === 'locked' ? 'Too many wrong tries for this email. Wait 15 minutes, then try again.' : "That email and password don't match. Check both and try again.";
     } catch (err) { msg.textContent = "Couldn't reach the sign-in service. Check your connection and try again."; }
     $('#send').disabled = false;
   });

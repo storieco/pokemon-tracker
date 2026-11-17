@@ -100,10 +100,10 @@ body:has(#login:not([hidden])),body:has(#denied:not([hidden])){background:var(--
 <div class="gate" id="login">
   <p class="kicker">Storie &amp; Saxe Co. Trackers</p>
   <h1>Pokémon Distributor Board</h1>
-  <p>Sign in with the email and access code you were given.</p>
+  <p>Sign in with your email and password.</p>
   <form id="login-form" autocomplete="on">
     <input id="email" type="email" autocomplete="username" placeholder="you@example.com" aria-label="Email" required>
-    <input id="code" type="password" autocomplete="current-password" autocapitalize="characters" spellcheck="false" placeholder="Access code (XXXX-XXXX)" aria-label="Access code" maxlength="20" required>
+    <input id="code" type="password" autocomplete="current-password" spellcheck="false" placeholder="Password" aria-label="Password" maxlength="200" required>
     <label class="remember"><input type="checkbox" id="remember"> Remember me on this device</label>
     <button class="btn primary" id="send" type="submit">Sign in</button>
   </form>
@@ -1211,6 +1211,6 @@ document.querySelectorAll('.pw .nav a').forEach(a => a.addEventListener('click',
 </div>
 </div>
 
-<script src="app.js?v=20261112d"></script>
+<script src="app.js?v=20261117"></script>
 </body>
 </html>
